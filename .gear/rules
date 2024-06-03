@@ -1,0 +1,3 @@
+tar: v@version@:.
+spec: .gear/python3-module-textual.spec
+copy?: .gear/*.patch
