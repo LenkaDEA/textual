@@ -4,7 +4,7 @@
 %def_with check
 
 Name: python3-module-%modulename
-Version: 0.64.0
+Version: 0.67.0
 Release: alt1
 
 Summary: Textual is a Rapid Application Development framework for Python
@@ -67,6 +67,9 @@ rm src/textual/drivers/win32.py
 %doc README.md docs/* examples/
 
 %changelog
+* Tue Jun 11 2024 Elena Dyatlenko <lenka@altlinux.org> 0.67.0-alt1
+- Updated to upstream version v0.67.0.
+
 * Mon Jun 03 2024 Elena Dyatlenko <lenka@altlinux.org> 0.64.0-alt1
 - Initial build for Sisyphus.
 
