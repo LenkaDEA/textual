@@ -301,6 +301,9 @@ TextArea {
 
     Changing this value will immediately re-render the `TextArea`."""
 
+    line_number_start: Reactive[int] = reactive(1, init=False)
+    """The line number the first line should be."""
+
     indent_width: Reactive[int] = reactive(4, init=False)
     """The width of tabs or the multiple of spaces to align to on pressing the `tab` key.
 
@@ -370,6 +373,7 @@ TextArea {
         tab_behavior: Literal["focus", "indent"] = "focus",
         read_only: bool = False,
         show_line_numbers: bool = False,
+        line_number_start: int = 1,
         max_checkpoints: int = 50,
         name: str | None = None,
         id: str | None = None,
@@ -387,6 +391,7 @@ TextArea {
             tab_behavior: If 'focus', pressing tab will switch focus. If 'indent', pressing tab will insert a tab.
             read_only: Enable read-only mode. This prevents edits using the keyboard.
             show_line_numbers: Show line numbers on the left edge.
+            line_number_start: What line number to start on.
             max_checkpoints: The maximum number of undo history checkpoints to retain.
             name: The name of the `TextArea` widget.
             id: The ID of the widget, used to refer to it from Textual CSS.
@@ -455,6 +460,7 @@ TextArea {
         self.set_reactive(TextArea.soft_wrap, soft_wrap)
         self.set_reactive(TextArea.read_only, read_only)
         self.set_reactive(TextArea.show_line_numbers, show_line_numbers)
+        self.set_reactive(TextArea.line_number_start, line_number_start)
 
         self.tab_behavior = tab_behavior
 
@@ -475,6 +481,7 @@ TextArea {
         tab_behavior: Literal["focus", "indent"] = "indent",
         read_only: bool = False,
         show_line_numbers: bool = True,
+        line_number_start: int = 1,
         max_checkpoints: int = 50,
         name: str | None = None,
         id: str | None = None,
@@ -494,6 +501,7 @@ TextArea {
             soft_wrap: Enable soft wrapping.
             tab_behavior: If 'focus', pressing tab will switch focus. If 'indent', pressing tab will insert a tab.
             show_line_numbers: Show line numbers on the left edge.
+            line_number_start: What line number to start on.
             name: The name of the `TextArea` widget.
             id: The ID of the widget, used to refer to it from Textual CSS.
             classes: One or more Textual CSS compatible class names separated by spaces.
@@ -508,6 +516,7 @@ TextArea {
             tab_behavior=tab_behavior,
             read_only=read_only,
             show_line_numbers=show_line_numbers,
+            line_number_start=line_number_start,
             max_checkpoints=max_checkpoints,
             name=name,
             id=id,
@@ -636,6 +645,7 @@ TextArea {
         match_location = None
         bracket_stack: list[str] = []
         if bracket in _OPENING_BRACKETS:
+            # Search forwards for a closing bracket
             for candidate, candidate_location in self._yield_character_locations(
                 search_from
             ):
@@ -651,6 +661,7 @@ TextArea {
                             match_location = candidate_location
                             break
         elif bracket in _CLOSING_BRACKETS:
+            # Search backwards for an opening bracket
             for (
                 candidate,
                 candidate_location,
@@ -688,6 +699,11 @@ TextArea {
 
     def _watch_show_line_numbers(self) -> None:
         """The line number gutter contributes to virtual size, so recalculate."""
+        self._rewrap_and_refresh_virtual_size()
+        self.scroll_cursor_visible()
+
+    def _watch_line_number_start(self) -> None:
+        """The line number gutter max size might change and contributes to virtual size, so recalculate."""
         self._rewrap_and_refresh_virtual_size()
         self.scroll_cursor_visible()
 
@@ -1142,7 +1158,9 @@ TextArea {
                 gutter_style = theme.gutter_style
 
             gutter_width_no_margin = gutter_width - 2
-            gutter_content = str(line_index + 1) if section_offset == 0 else ""
+            gutter_content = (
+                str(line_index + self.line_number_start) if section_offset == 0 else ""
+            )
             gutter = Text(
                 f"{gutter_content:>{gutter_width_no_margin}}  ",
                 style=gutter_style or "",
@@ -1236,6 +1254,11 @@ TextArea {
         """The text between the start and end points of the current selection."""
         start, end = self.selection
         return self.get_text_range(start, end)
+
+    @property
+    def matching_bracket_location(self) -> Location | None:
+        """The location of the matching bracket, if there is one."""
+        return self._matching_bracket_location
 
     def get_text_range(self, start: Location, end: Location) -> str:
         """Get the text between a start and end location.
@@ -1467,7 +1490,8 @@ TextArea {
         # The longest number in the gutter plus two extra characters: `│ `.
         gutter_margin = 2
         gutter_width = (
-            len(str(self.document.line_count)) + gutter_margin
+            len(str(self.document.line_count - 1 + self.line_number_start))
+            + gutter_margin
             if self.show_line_numbers
             else 0
         )
