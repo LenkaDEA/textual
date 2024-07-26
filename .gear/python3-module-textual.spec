@@ -7,7 +7,7 @@
 %define docdir %_docdir/%name-doc-%version
 
 Name: python3-module-%modulename
-Version: 0.73.0
+Version: 0.74.0
 Release: alt1
 
 Summary: Textual is a Rapid Application Development framework for Python
@@ -29,6 +29,7 @@ BuildRequires: python3-module-typing_extensions
 BuildRequires: python3-module-pytest-asyncio
 BuildRequires: python3-module-linkify-it-py
 BuildRequires: python3-module-pytest-textual-snapshot
+BuildRequires: python3-module-pytest-xdist
 %endif
 
 %description
@@ -87,6 +88,9 @@ cp -a README.md examples docs %buildroot%docdir
 %exclude %docdir/docs/blog
 
 %changelog
+* Fri Jul 26 2024 Elena Dyatlenko <lenka@altlinux.org> 0.74.0-alt1
+- Updated to upstream version v0.74.0.
+
 * Mon Jul 22 2024 Elena Dyatlenko <lenka@altlinux.org> 0.73.0-alt1
 - Updated to upstream version v0.73.0.
 
