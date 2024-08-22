@@ -1388,3 +1388,25 @@ def test_progress_gradient(snap_compare):
 def test_recompose_in_mount(snap_compare):
     """Regression test for https://github.com/Textualize/textual/issues/4799"""
     assert snap_compare(SNAPSHOT_APPS_DIR / "recompose_on_mount.py")
+
+
+def test_enter_or_leave(snap_compare) -> None:
+    async def run_before(pilot: Pilot):
+        await pilot.hover("#foo")
+
+    assert snap_compare(SNAPSHOT_APPS_DIR / "enter_or_leave.py", run_before=run_before)
+
+
+def test_remove_tab_no_animation(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/4814"""
+    assert snap_compare(SNAPSHOT_APPS_DIR / "remove_tab.py", press=["space"])
+
+
+def test_auto_height_scrollbar(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/4778"""
+    assert snap_compare(SNAPSHOT_APPS_DIR / "data_table_auto_height.py")
+
+
+def test_bind_override(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/4755"""
+    assert snap_compare(SNAPSHOT_APPS_DIR / "bind_override.py")

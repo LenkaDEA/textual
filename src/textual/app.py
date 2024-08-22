@@ -80,7 +80,7 @@ from ._wait import wait_for_idle
 from .actions import ActionParseResult, SkipAction
 from .await_complete import AwaitComplete
 from .await_remove import AwaitRemove
-from .binding import Binding, BindingType, _Bindings
+from .binding import Binding, BindingsMap, BindingType
 from .command import CommandPalette, Provider
 from .css.errors import StylesheetError
 from .css.query import NoMatches
@@ -2304,16 +2304,16 @@ class App(Generic[ReturnType], DOMNode):
         if widget is None:
             if self.mouse_over is not None:
                 try:
-                    self.mouse_over.post_message(events.Leave())
+                    self.mouse_over.post_message(events.Leave(self.mouse_over))
                 finally:
                     self.mouse_over = None
         else:
             if self.mouse_over is not widget:
                 try:
                     if self.mouse_over is not None:
-                        self.mouse_over.post_message(events.Leave())
+                        self.mouse_over.post_message(events.Leave(self.mouse_over))
                     if widget is not None:
-                        widget.post_message(events.Enter())
+                        widget.post_message(events.Enter(widget))
                 finally:
                     self.mouse_over = widget
 
@@ -3000,14 +3000,14 @@ class App(Generic[ReturnType], DOMNode):
             self._driver.write("\07")
 
     @property
-    def _binding_chain(self) -> list[tuple[DOMNode, _Bindings]]:
+    def _binding_chain(self) -> list[tuple[DOMNode, BindingsMap]]:
         """Get a chain of nodes and bindings to consider.
 
         If no widget is focused, returns the bindings from both the screen and the app level bindings.
         Otherwise, combines all the bindings from the currently focused node up the DOM to the root App.
         """
         focused = self.focused
-        namespace_bindings: list[tuple[DOMNode, _Bindings]]
+        namespace_bindings: list[tuple[DOMNode, BindingsMap]]
 
         if focused is None:
             namespace_bindings = [
@@ -3048,10 +3048,11 @@ class App(Generic[ReturnType], DOMNode):
             if priority
             else self.screen._modal_binding_chain
         ):
-            binding = bindings.keys.get(key)
-            if binding is not None and binding.priority == priority:
-                if await self.run_action(binding.action, namespace):
-                    return True
+            key_bindings = bindings.key_to_bindings.get(key, ())
+            for binding in key_bindings:
+                if binding.priority == priority:
+                    if await self.run_action(binding.action, namespace):
+                        return True
         return False
 
     async def on_event(self, event: events.Event) -> None:
@@ -3679,3 +3680,13 @@ class App(Generic[ReturnType], DOMNode):
             # NOTE: There is no call to publish the resume signal here, this
             # will be handled by the driver posting a SignalResume event
             # (see the event handler on App._resume_signal) above.
+
+    def open_url(self, url: str, *, new_tab: bool = True) -> None:
+        """Open a URL in the default web browser.
+
+        Args:
+            url: The URL to open.
+            new_tab: Whether to open the URL in a new tab.
+        """
+        if self._driver is not None:
+            self._driver.open_url(url, new_tab)
