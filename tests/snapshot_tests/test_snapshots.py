@@ -3,10 +3,10 @@ from pathlib import Path
 import pytest
 
 from tests.snapshot_tests.language_snippets import SNIPPETS
+from textual.app import App, ComposeResult
 from textual.pilot import Pilot
-from textual.widgets.text_area import Selection, BUILTIN_LANGUAGES
-from textual.widgets import RichLog, TextArea, Input, Button
-from textual.widgets.text_area import TextAreaTheme
+from textual.widgets import Button, Input, RichLog, TextArea
+from textual.widgets.text_area import BUILTIN_LANGUAGES, Selection, TextAreaTheme
 
 # These paths should be relative to THIS directory.
 WIDGET_EXAMPLES_DIR = Path("../../docs/examples/widgets")
@@ -796,7 +796,7 @@ def test_tooltips_in_compound_widgets(snap_compare):
     async def run_before(pilot) -> None:
         await pilot.pause()
         await pilot.hover("ProgressBar")
-        await pilot.pause(0.3)
+        await pilot.pause(0.4)
         await pilot.pause()
 
     assert snap_compare(SNAPSHOT_APPS_DIR / "tooltips.py", run_before=run_before)
@@ -1195,7 +1195,7 @@ def test_example_color_command(snap_compare):
     """Test the color_command example."""
     assert snap_compare(
         EXAMPLES_DIR / "color_command.py",
-        press=["ctrl+backslash", "r", "e", "d", "down", "enter"],
+        press=[App.COMMAND_PALETTE_BINDING, "r", "e", "d", "down", "enter"],
     )
 
 
@@ -1410,3 +1410,81 @@ def test_auto_height_scrollbar(snap_compare):
 def test_bind_override(snap_compare):
     """Regression test for https://github.com/Textualize/textual/issues/4755"""
     assert snap_compare(SNAPSHOT_APPS_DIR / "bind_override.py")
+
+
+def test_command_palette_dismiss_escape(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/4856"""
+
+    async def run_before(pilot: Pilot):
+        await pilot.press(App.COMMAND_PALETTE_BINDING)
+        await pilot.pause()
+        await pilot.press("escape")
+
+    assert snap_compare(
+        SNAPSHOT_APPS_DIR / "command_palette_dismiss.py", run_before=run_before
+    )
+
+
+def test_command_palette_dismiss_escape_no_results(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/4856"""
+
+    async def run_before(pilot: Pilot):
+        await pilot.press(App.COMMAND_PALETTE_BINDING)
+        await pilot.pause()
+        await pilot.press(*"foo")
+        await pilot.app.workers.wait_for_complete()
+        await pilot.press("escape")
+
+    assert snap_compare(
+        SNAPSHOT_APPS_DIR / "command_palette_dismiss.py", run_before=run_before
+    )
+
+
+def test_command_palette_key_change(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/4887"""
+    assert snap_compare(SNAPSHOT_APPS_DIR / "command_palette_key.py")
+
+
+def test_split(snap_compare):
+    """Test split rule."""
+    assert snap_compare(SNAPSHOT_APPS_DIR / "split.py", terminal_size=(100, 30))
+
+
+def test_system_commands(snap_compare):
+    """The system commands should appear in the command palette."""
+
+    class SimpleApp(App):
+        def compose(self) -> ComposeResult:
+            yield Input()
+
+    assert snap_compare(
+        SimpleApp(),
+        terminal_size=(100, 30),
+        press=["ctrl+p"],
+    )
+
+
+def test_help_panel(snap_compare):
+    """Test help panel."""
+
+    class HelpPanelApp(App):
+        def compose(self) -> ComposeResult:
+            yield Input()
+
+    async def run_before(pilot: Pilot):
+        pilot.app.query(Input).first().cursor_blink = False
+        await pilot.press(App.COMMAND_PALETTE_BINDING)
+        await pilot.pause()
+        await pilot.press(*"keys")
+        await pilot.press("enter")
+        await pilot.app.workers.wait_for_complete()
+
+    assert snap_compare(HelpPanelApp(), terminal_size=(100, 30), run_before=run_before)
+
+
+def test_scroll_page_down(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/4914"""
+    # Should show 25 at the top
+    assert snap_compare(
+        SNAPSHOT_APPS_DIR / "scroll_page.py", press=["pagedown"], terminal_size=(80, 25)
+    )

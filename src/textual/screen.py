@@ -284,7 +284,6 @@ class Screen(Generic[ScreenResultType], Widget):
 
     def refresh_bindings(self) -> None:
         """Call to request a refresh of bindings."""
-        self.log.debug("Bindings updated")
         self._bindings_updated = True
         self.check_idle()
 
@@ -348,10 +347,14 @@ class Screen(Generic[ScreenResultType], Widget):
                         binding.priority
                         and not existing_key_and_binding.binding.priority
                     ):
-                        bindings_map[key] = ActiveBinding(namespace, binding, enabled)
+                        bindings_map[key] = ActiveBinding(
+                            namespace, binding, enabled, binding.tooltip
+                        )
                 else:
                     # New binding
-                    bindings_map[key] = ActiveBinding(namespace, binding, enabled)
+                    bindings_map[key] = ActiveBinding(
+                        namespace, binding, enabled, binding.tooltip
+                    )
 
         return bindings_map
 
@@ -1169,7 +1172,7 @@ class Screen(Generic[ScreenResultType], Widget):
                             self._tooltip_timer.stop()
 
                         self._tooltip_timer = self.set_timer(
-                            0.3,
+                            self.app.TOOLTIP_DELAY,
                             partial(self._handle_tooltip_timer, widget),
                             name="tooltip-timer",
                         )

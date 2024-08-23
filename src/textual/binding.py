@@ -50,6 +50,17 @@ class Binding:
     """How the key should be shown in footer."""
     priority: bool = False
     """Enable priority binding for this key."""
+    tooltip: str = ""
+    """Optional tooltip to show in footer."""
+
+    def parse_key(self) -> tuple[list[str], str]:
+        """Parse a key in to a list of modifiers, and the actual key.
+
+        Returns:
+            A tuple of (MODIFIER LIST, KEY).
+        """
+        *modifiers, key = self.key.split("+")
+        return modifiers, key
 
 
 class ActiveBinding(NamedTuple):
@@ -61,6 +72,8 @@ class ActiveBinding(NamedTuple):
     """The binding information."""
     enabled: bool
     """Is the binding enabled? (enabled bindings are typically rendered dim)"""
+    tooltip: str = ""
+    """Optional tooltip shown in Footer."""
 
 
 @rich.repr.auto
@@ -112,11 +125,20 @@ class BindingsMap:
                         show=bool(binding.description and binding.show),
                         key_display=binding.key_display,
                         priority=binding.priority,
+                        tooltip=binding.tooltip,
                     )
 
         self.key_to_bindings: dict[str, list[Binding]] = {}
         for binding in make_bindings(bindings or {}):
             self.key_to_bindings.setdefault(binding.key, []).append(binding)
+
+    def _add_binding(self, binding: Binding) -> None:
+        """Add a new binding.
+
+        Args:
+            binding: New Binding to add.
+        """
+        self.key_to_bindings.setdefault(binding.key, []).append(binding)
 
     def __iter__(self) -> Iterator[tuple[str, Binding]]:
         """Iterating produces a sequence of (KEY, BINDING) tuples."""
