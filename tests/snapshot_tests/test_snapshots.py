@@ -4,8 +4,13 @@ import pytest
 
 from tests.snapshot_tests.language_snippets import SNIPPETS
 from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Vertical
 from textual.pilot import Pilot
-from textual.widgets import Button, Input, RichLog, TextArea
+from textual.screen import Screen
+from textual.widgets import Button, Input, RichLog, TextArea, Footer
+from textual.widgets import Switch
+from textual.widgets import Label
 from textual.widgets.text_area import BUILTIN_LANGUAGES, Selection, TextAreaTheme
 
 # These paths should be relative to THIS directory.
@@ -1455,10 +1460,14 @@ def test_system_commands(snap_compare):
 
     class SimpleApp(App):
         def compose(self) -> ComposeResult:
-            yield Input()
+            input = Input()
+            input.cursor_blink = False
+            yield input
 
+    app = SimpleApp()
+    app.animation_level = "none"
     assert snap_compare(
-        SimpleApp(),
+        app,
         terminal_size=(100, 30),
         press=["ctrl+p"],
     )
@@ -1488,3 +1497,182 @@ def test_scroll_page_down(snap_compare):
     assert snap_compare(
         SNAPSHOT_APPS_DIR / "scroll_page.py", press=["pagedown"], terminal_size=(80, 25)
     )
+
+
+def test_maximize(snap_compare):
+    """Check that maximize isolates a single widget."""
+
+    class MaximizeApp(App):
+        BINDINGS = [("m", "screen.maximize", "maximize focused widget")]
+
+        def compose(self) -> ComposeResult:
+            yield Button("Hello")
+            yield Button("World")
+            yield Footer()
+
+    assert snap_compare(MaximizeApp(), press=["m"])
+
+
+def test_maximize_container(snap_compare):
+    """Check maximizing a widget in a maximizeable container, maximizes the container."""
+
+    class FormContainer(Vertical):
+        ALLOW_MAXIMIZE = True
+        DEFAULT_CSS = """
+        FormContainer {
+            width: 50%;
+            border: blue;            
+        }
+        """
+
+    class MaximizeApp(App):
+        BINDINGS = [("m", "screen.maximize", "maximize focused widget")]
+
+        def compose(self) -> ComposeResult:
+            with FormContainer():
+                yield Button("Hello")
+                yield Button("World")
+            yield Footer()
+
+    assert snap_compare(MaximizeApp(), press=["m"])
+
+
+def test_check_consume_keys(snap_compare):
+    """Check that when an Input is focused it hides printable keys from the footer."""
+
+    class MyApp(App):
+        BINDINGS = [
+            Binding(key="q", action="quit", description="Quit the app"),
+            Binding(
+                key="question_mark",
+                action="help",
+                description="Show help screen",
+                key_display="?",
+            ),
+            Binding(key="delete", action="delete", description="Delete the thing"),
+            Binding(key="j", action="down", description="Scroll down", show=False),
+        ]
+
+        def compose(self) -> ComposeResult:
+            yield Input(placeholder="First Name")
+            yield Input(placeholder="Last Name")
+            yield Switch()
+            yield Footer()
+
+    assert snap_compare(MyApp())
+
+
+def test_escape_to_minimize(snap_compare):
+    """Check escape minimizes. Regression test for https://github.com/Textualize/textual/issues/4939"""
+
+    TEXT = """\
+    def hello(name):
+        print("hello" + name)
+
+    def goodbye(name):
+        print("goodbye" + name)
+    """
+
+    class TextAreaExample(App):
+        BINDINGS = [("ctrl+m", "screen.maximize")]
+        CSS = """
+        Screen {
+            align: center middle;
+        }
+
+        #code-container {
+            width: 20;
+            height: 10;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            with Vertical(id="code-container"):
+                text_area = TextArea.code_editor(TEXT)
+                text_area.cursor_blink = False
+                yield text_area
+
+    # ctrl+m to maximize, escape should minimize
+    assert snap_compare(TextAreaExample(), press=["ctrl+m", "escape"])
+
+
+def test_escape_to_minimize_disabled(snap_compare):
+    """Set escape to minimize disabled by app"""
+
+    TEXT = """\
+    def hello(name):
+        print("hello" + name)
+
+    def goodbye(name):
+        print("goodbye" + name)
+    """
+
+    class TextAreaExample(App):
+        # Disables escape to minimize
+        ESCAPE_TO_MINIMIZE = False
+        BINDINGS = [("ctrl+m", "screen.maximize")]
+        CSS = """
+        Screen {
+            align: center middle;
+        }
+
+        #code-container {
+            width: 20;
+            height: 10;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            with Vertical(id="code-container"):
+                text_area = TextArea.code_editor(TEXT)
+                text_area.cursor_blink = False
+                yield text_area
+
+    # ctrl+m to maximize, escape should *not* minimize
+    assert snap_compare(TextAreaExample(), press=["ctrl+m", "escape"])
+
+
+def test_escape_to_minimize_screen_override(snap_compare):
+    """Test escape to minimize can be overridden by the screen"""
+
+    TEXT = """\
+    def hello(name):
+        print("hello" + name)
+
+    def goodbye(name):
+        print("goodbye" + name)
+    """
+
+    class TestScreen(Screen):
+        # Disabled on the screen
+        ESCAPE_TO_MINIMIZE = True
+
+        def compose(self) -> ComposeResult:
+            with Vertical(id="code-container"):
+                text_area = TextArea.code_editor(TEXT)
+                text_area.cursor_blink = False
+                yield text_area
+
+    class TextAreaExample(App):
+        # Enabled on app
+        ESCAPE_TO_MINIMIZE = False
+        BINDINGS = [("ctrl+m", "screen.maximize")]
+        CSS = """
+        Screen {
+            align: center middle;
+        }
+
+        #code-container {
+            width: 20;
+            height: 10;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            yield Label("You are looking at the default screen")
+
+        def on_mount(self) -> None:
+            self.push_screen(TestScreen())
+
+    # ctrl+m to maximize, escape *should* minimize
+    assert snap_compare(TextAreaExample(), press=["ctrl+m", "escape"])

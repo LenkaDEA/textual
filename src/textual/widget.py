@@ -87,7 +87,6 @@ from .render import measure
 from .renderables.blank import Blank
 from .rlock import RLock
 from .strip import Strip
-from .walk import walk_depth_first
 
 if TYPE_CHECKING:
     from .app import App, ComposeResult
@@ -304,6 +303,15 @@ class Widget(DOMNode):
     BORDER_SUBTITLE: ClassVar[str] = ""
     """Initial value for border_subtitle attribute."""
 
+    ALLOW_MAXIMIZE: ClassVar[bool | None] = None
+    """Defines default logic to allow the widget to be maximized.
+    
+    - `None` Use default behavior (Focusable widgets may be maximized)
+    - `False` Do not allow widget to be maximized
+    - `True` Allow widget to be maximized
+    
+    """
+
     can_focus: bool = False
     """Widget may receive focus."""
     can_focus_children: bool = True
@@ -515,6 +523,15 @@ class Widget(DOMNode):
         )
 
     @property
+    def allow_maximize(self) -> bool:
+        """Check if the widget may be maximized.
+
+        Returns:
+            `True` if the widget may be maximized, or `False` if it should not be maximized.
+        """
+        return self.can_focus if self.ALLOW_MAXIMIZE is None else self.ALLOW_MAXIMIZE
+
+    @property
     def offset(self) -> Offset:
         """Widget offset from origin.
 
@@ -557,6 +574,14 @@ class Widget(DOMNode):
             if widget is self:
                 return True
         return False
+
+    @property
+    def is_maximized(self) -> bool:
+        """Is this widget maximized?"""
+        try:
+            return self.screen.maximized is self
+        except NoScreen:
+            return False
 
     def anchor(self, *, animate: bool = False) -> None:
         """Anchor the widget, which scrolls it into view (like [scroll_visible][textual.widget.Widget.scroll_visible]),
@@ -613,7 +638,7 @@ class Widget(DOMNode):
         """Check if the widget is permitted to focus.
 
         The base class returns [`can_focus`][textual.widget.Widget.can_focus].
-        This method maybe overridden if additional logic is required.
+        This method may be overridden if additional logic is required.
 
         Returns:
             `True` if the widget may be focused, or `False` if it may not be focused.
@@ -624,7 +649,7 @@ class Widget(DOMNode):
         """Check if a widget's children may be focused.
 
         The base class returns [`can_focus_children`][textual.widget.Widget.can_focus_children].
-        This method maybe overridden if additional logic is required.
+        This method may be overridden if additional logic is required.
 
         Returns:
             `True` if the widget's children may be focused, or `False` if the widget's children may not be focused.
@@ -781,21 +806,14 @@ class Widget(DOMNode):
             NoMatches: if no children could be found for this ID.
             WrongType: if the wrong type was found.
         """
-        # We use Widget as a filter_type so that the inferred type of child is Widget.
-        for child in walk_depth_first(self, filter_type=Widget):
-            try:
-                if expect_type is None:
-                    return child.get_child_by_id(id)
-                else:
-                    return child.get_child_by_id(id, expect_type=expect_type)
-            except NoMatches:
-                pass
-            except WrongType as exc:
-                raise WrongType(
-                    f"Descendant with id={id!r} is wrong type; expected {expect_type},"
-                    f" got {type(child)}"
-                ) from exc
-        raise NoMatches(f"No descendant found with id={id!r}")
+
+        widget = self.query_one(f"#{id}")
+        if expect_type is not None and not isinstance(widget, expect_type):
+            raise WrongType(
+                f"Descendant with id={id!r} is wrong type; expected {expect_type},"
+                f" got {type(widget)}"
+            )
+        return widget
 
     def get_child_by_type(self, expect_type: type[ExpectType]) -> ExpectType:
         """Get the first immediate child of a given type.
@@ -932,7 +950,7 @@ class Widget(DOMNode):
         # can be passed to query_one. So let's use that to get a widget to
         # work on.
         if isinstance(spot, str):
-            spot = self.query_one(spot, Widget)
+            spot = self.query_exactly_one(spot, Widget)
 
         # At this point we should have a widget, either because we got given
         # one, or because we pulled one out of the query. First off, does it
@@ -1787,7 +1805,7 @@ class Widget(DOMNode):
 
     @property
     def virtual_region(self) -> Region:
-        """The widget region relative to it's container (which may not be visible,
+        """The widget region relative to its container (which may not be visible,
         depending on scroll offset).
 
 
@@ -2819,7 +2837,7 @@ class Widget(DOMNode):
                     scrolled = True
 
             # Adjust the region by the amount we just scrolled it, and convert to
-            # it's parent's virtual coordinate system.
+            # its parent's virtual coordinate system.
 
             region = (
                 (
@@ -3045,7 +3063,7 @@ class Widget(DOMNode):
         name = cls.__name__
         if not name[0].isupper() and not name.startswith("_"):
             raise BadWidgetName(
-                f"Widget subclass {name!r} should be capitalised or start with '_'."
+                f"Widget subclass {name!r} should be capitalized or start with '_'."
             )
 
         super().__init_subclass__(
