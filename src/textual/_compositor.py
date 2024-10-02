@@ -29,20 +29,20 @@ from rich.control import Control
 from rich.segment import Segment
 from rich.style import Style
 
-from . import errors
-from ._cells import cell_len
-from ._context import visible_screen_stack
-from ._loop import loop_last
-from .geometry import NULL_OFFSET, NULL_SPACING, Offset, Region, Size, Spacing
-from .map_geometry import MapGeometry
-from .strip import Strip, StripRenderable
+from textual import errors
+from textual._cells import cell_len
+from textual._context import visible_screen_stack
+from textual._loop import loop_last
+from textual.geometry import NULL_OFFSET, NULL_SPACING, Offset, Region, Size, Spacing
+from textual.map_geometry import MapGeometry
+from textual.strip import Strip, StripRenderable
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
 
-    from .css.styles import RenderStyles
-    from .screen import Screen
-    from .widget import Widget
+    from textual.css.styles import RenderStyles
+    from textual.screen import Screen
+    from textual.widget import Widget
 
 
 class ReflowResult(NamedTuple):
@@ -149,7 +149,9 @@ class InlineUpdate(CompositorUpdate):
             if not last:
                 append("\n")
         if self.clear:
-            append("\n\x1b[J")  # Clear down
+            if len(self.strips) > 1:
+                append("\n")
+            append("\x1b[J")  # Clear down
         if len(self.strips) > 1:
             back_lines = len(self.strips) if self.clear else len(self.strips) - 1
             append(f"\x1b[{back_lines}A\r")  # Move cursor back to original position
@@ -309,6 +311,18 @@ class Compositor:
         # Mapping of line numbers on to lists of widget and regions
         self._layers_visible: list[list[tuple[Widget, Region, Region]]] | None = None
 
+        # New widgets added between updates
+        self._new_widgets: set[Widget] = set()
+
+    def clear(self) -> None:
+        """Remove all references to widgets (used when the screen closes)."""
+        self._full_map.clear()
+        self._visible_map = None
+        self._layers = None
+        self.widgets.clear()
+        self._visible_widgets = None
+        self._layers_visible = None
+
     @classmethod
     def _regions_to_spans(
         cls, regions: Iterable[Region]
@@ -378,7 +392,9 @@ class Compositor:
         new_widgets = map.keys()
 
         # Newly visible widgets
-        shown_widgets = new_widgets - old_widgets
+        shown_widgets = (new_widgets - old_widgets) | self._new_widgets
+        self._new_widgets.clear()
+
         # Newly hidden widgets
         hidden_widgets = self.widgets - widgets
 
@@ -410,7 +426,6 @@ class Compositor:
             for widget, (region, *_) in changes
             if (widget in common_widgets and old_map[widget].region[2:] != region[2:])
         }
-
         return ReflowResult(
             hidden=hidden_widgets,
             shown=shown_widgets,
@@ -474,6 +489,8 @@ class Compositor:
         if self._full_map_invalidated:
             self._full_map_invalidated = False
             map, _widgets = self._arrange_root(self.root, self.size, visible_only=False)
+            # Update any widgets which became visible in the interim
+            self._new_widgets.update(map.keys() - self._full_map.keys())
             self._full_map = map
             self._visible_widgets = None
             self._visible_map = None

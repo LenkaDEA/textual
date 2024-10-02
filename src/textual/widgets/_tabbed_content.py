@@ -9,15 +9,15 @@ from rich.repr import Result
 from rich.text import Text, TextType
 from typing_extensions import Final
 
-from .. import events
-from ..app import ComposeResult
-from ..await_complete import AwaitComplete
-from ..css.query import NoMatches
-from ..message import Message
-from ..reactive import reactive
-from ..widget import Widget
-from ._content_switcher import ContentSwitcher
-from ._tabs import Tab, Tabs
+from textual import events
+from textual.app import ComposeResult
+from textual.await_complete import AwaitComplete
+from textual.css.query import NoMatches
+from textual.message import Message
+from textual.reactive import reactive
+from textual.widget import Widget
+from textual.widgets._content_switcher import ContentSwitcher
+from textual.widgets._tabs import Tab, Tabs
 
 __all__ = [
     "ContentTab",
@@ -324,10 +324,10 @@ class TabbedContent(Widget):
         Args:
             *titles: Positional argument will be used as title.
             initial: The id of the initial tab, or empty string to select the first tab.
-            name: The name of the button.
-            id: The ID of the button in the DOM.
-            classes: The CSS classes of the button.
-            disabled: Whether the button is disabled or not.
+            name: The name of the tabbed content.
+            id: The ID of the tabbed content in the DOM.
+            classes: The CSS classes of the tabbed content.
+            disabled: Whether the tabbed content is disabled or not.
         """
         self.titles = [self.render_str(title) for title in titles]
         self._tab_content: list[Widget] = []

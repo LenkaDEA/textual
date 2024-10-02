@@ -9,25 +9,25 @@ from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
 
-from . import log
-from ._ansi_theme import DEFAULT_TERMINAL_THEME
-from ._border import get_box, render_border_label, render_row
-from ._context import active_app
-from ._opacity import _apply_opacity
-from ._segment_tools import apply_hatch, line_pad, line_trim
-from .color import Color
-from .constants import DEBUG
-from .filter import LineFilter
-from .geometry import Region, Size, Spacing
-from .renderables.text_opacity import TextOpacity
-from .renderables.tint import Tint
-from .strip import Strip
+from textual import log
+from textual._ansi_theme import DEFAULT_TERMINAL_THEME
+from textual._border import get_box, render_border_label, render_row
+from textual._context import active_app
+from textual._opacity import _apply_opacity
+from textual._segment_tools import apply_hatch, line_pad, line_trim
+from textual.color import Color
+from textual.constants import DEBUG
+from textual.filter import LineFilter
+from textual.geometry import Region, Size, Spacing
+from textual.renderables.text_opacity import TextOpacity
+from textual.renderables.tint import Tint
+from textual.strip import Strip
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
 
-    from .css.styles import StylesBase
-    from .widget import Widget
+    from textual.css.styles import StylesBase
+    from textual.widget import Widget
 
 RenderLineCallback: TypeAlias = Callable[[int], Strip]
 
@@ -213,6 +213,9 @@ class StylesCache:
 
         is_dirty = self._dirty_lines.__contains__
         render_line = self.render_line
+        apply_filters = (
+            [] if filters is None else [filter for filter in filters if filter.enabled]
+        )
         for y in crop.line_range:
             if is_dirty(y) or y not in self._cache:
                 strip = render_line(
@@ -233,9 +236,8 @@ class StylesCache:
             else:
                 strip = self._cache[y]
 
-            if filters:
-                for filter in filters:
-                    strip = strip.apply_filter(filter, background)
+            for filter in apply_filters:
+                strip = strip.apply_filter(filter, background)
 
             if DEBUG:
                 if any([not (segment.control or segment.text) for segment in strip]):
@@ -313,7 +315,7 @@ class StylesCache:
 
         def line_post(segments: Iterable[Segment]) -> Iterable[Segment]:
             """Apply effects to segments inside the border."""
-            if styles.has_rule("hatch"):
+            if styles.has_rule("hatch") and styles.hatch != "none":
                 character, color = styles.hatch
                 if character != " " and color.a > 0:
                     hatch_style = Style.from_color(

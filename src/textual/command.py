@@ -30,23 +30,23 @@ from rich.style import Style
 from rich.text import Text
 from typing_extensions import Final, TypeAlias
 
-from . import on, work
-from .binding import Binding, BindingType
-from .containers import Horizontal, Vertical
-from .events import Click, Mount
-from .fuzzy import Matcher
-from .message import Message
-from .reactive import var
-from .screen import Screen, SystemModalScreen
-from .timer import Timer
-from .types import IgnoreReturnCallbackType
-from .widget import Widget
-from .widgets import Button, Input, LoadingIndicator, OptionList, Static
-from .widgets.option_list import Option
-from .worker import get_current_worker
+from textual import on, work
+from textual.binding import Binding, BindingType
+from textual.containers import Horizontal, Vertical
+from textual.events import Click, Mount
+from textual.fuzzy import Matcher
+from textual.message import Message
+from textual.reactive import var
+from textual.screen import Screen, SystemModalScreen
+from textual.timer import Timer
+from textual.types import IgnoreReturnCallbackType
+from textual.widget import Widget
+from textual.widgets import Button, Input, LoadingIndicator, OptionList, Static
+from textual.widgets.option_list import Option
+from textual.worker import get_current_worker
 
 if TYPE_CHECKING:
-    from .app import App, ComposeResult
+    from textual.app import App, ComposeResult
 
 __all__ = [
     "CommandPalette",
@@ -136,6 +136,16 @@ class DiscoveryHit:
     def prompt(self) -> RenderableType:
         """The prompt to use when displaying the discovery hit in the command palette."""
         return self.display
+
+    @property
+    def score(self) -> float:
+        """A discovery hit always has a score of 0.
+
+        The order in which discovery hits are displayed is determined by the order
+        in which they are yielded by the Provider. It's up to the developer to yield
+        DiscoveryHits in the .
+        """
+        return 0.0
 
     def __lt__(self, other: object) -> bool:
         if isinstance(other, DiscoveryHit):
@@ -241,6 +251,7 @@ class Provider(ABC):
         """Wait for initialization."""
         if self._init_task is not None:
             await self._init_task
+        self._init_task = None
 
     async def startup(self) -> None:
         """Called after the Provider is initialized, but before any calls to `search`."""
@@ -311,12 +322,12 @@ class Provider(ABC):
 @rich.repr.auto
 @total_ordering
 class Command(Option):
-    """Class that holds a command in the [`CommandList`][textual.command.CommandList]."""
+    """Class that holds a hit in the [`CommandList`][textual.command.CommandList]."""
 
     def __init__(
         self,
         prompt: RenderableType,
-        command: DiscoveryHit | Hit,
+        hit: DiscoveryHit | Hit,
         id: str | None = None,
         disabled: bool = False,
     ) -> None:
@@ -324,22 +335,22 @@ class Command(Option):
 
         Args:
             prompt: The prompt for the option.
-            command: The details of the command associated with the option.
+            hit: The details of the hit associated with the option.
             id: The optional ID for the option.
             disabled: The initial enabled/disabled state. Enabled by default.
         """
         super().__init__(prompt, id, disabled)
-        self.command = command
-        """The details of the command associated with the option."""
+        self.hit = hit
+        """The details of the hit associated with the option."""
 
     def __lt__(self, other: object) -> bool:
         if isinstance(other, Command):
-            return self.command < other.command
+            return self.hit < other.hit
         return NotImplemented
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Command):
-            return self.command == other.command
+            return self.hit == other.hit
         return NotImplemented
 
 
@@ -374,6 +385,10 @@ class CommandList(OptionList, can_focus=False):
 
     CommandList > .option-list--option-highlighted {
         background: $primary;
+    }
+
+    CommandList:nocolor > .option-list--option-highlighted {       
+        text-style: reverse;
     }
 
     CommandList > .option-list--option {
@@ -448,6 +463,10 @@ class CommandPalette(SystemModalScreen):
         #--container {
             display: none;
         }
+
+        &:ansi {
+            background: transparent;
+        }
     }
 
     CommandPalette.-ready {
@@ -467,6 +486,11 @@ class CommandPalette(SystemModalScreen):
     CommandPalette > .command-palette--highlight {
         text-style: bold;
         color: $warning-darken-2;
+
+    }
+
+    CommandPalette:nocolor > .command-palette--highlight {
+        text-style: underline;
     }
 
     CommandPalette > Vertical {
@@ -890,7 +914,12 @@ class CommandPalette(SystemModalScreen):
             if command_list.highlighted is not None and not clear_current
             else None
         )
-        command_list.clear_options().add_options(commands)
+
+        def sort_key(command: Command) -> float:
+            return -command.hit.score
+
+        sorted_commands = sorted(commands, key=sort_key)
+        command_list.clear_options().add_options(sorted_commands)
         if highlighted is not None and highlighted.id:
             command_list.highlighted = command_list.get_option_index(highlighted.id)
 
@@ -1060,8 +1089,9 @@ class CommandPalette(SystemModalScreen):
         input = self.query_one(CommandInput)
         with self.prevent(Input.Changed):
             assert isinstance(event.option, Command)
-            input.value = str(event.option.command.text)
-            self._selected_command = event.option.command
+            hit = event.option.hit
+            input.value = str(hit.text)
+            self._selected_command = hit
         input.action_end()
         self._list_visible = False
         self.query_one(CommandList).clear_options()

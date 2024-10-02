@@ -9,7 +9,7 @@ from typing import get_args
 
 from typing_extensions import Final, TypeGuard
 
-from ._types import AnimationLevel
+from textual._types import AnimationLevel
 
 get_environ = os.environ.get
 
@@ -118,3 +118,8 @@ TEXTUAL_ANIMATIONS: Final[AnimationLevel] = _get_textual_animations()
 
 ESCAPE_DELAY: Final[float] = _get_environ_int("ESCDELAY", 100) / 1000.0
 """The delay (in seconds) before reporting an escape key (not used if the extend key protocol is available)."""
+
+SLOW_THRESHOLD: int = _get_environ_int("TEXTUAL_SLOW_THRESHOLD", 500)
+"""The time threshold (in milliseconds) after which a warning is logged 
+if message processing exceeds this duration.
+"""

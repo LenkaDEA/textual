@@ -26,7 +26,7 @@ VALID_BORDER: Final = {
     "vkey",
     "wide",
 }
-VALID_EDGE: Final = {"top", "right", "bottom", "left"}
+VALID_EDGE: Final = {"top", "right", "bottom", "left", "none"}
 VALID_LAYOUT: Final = {"vertical", "horizontal", "grid"}
 
 VALID_BOX_SIZING: Final = {"border-box", "content-box"}
@@ -60,6 +60,7 @@ VALID_STYLE_FLAGS: Final = {
     "uu",
 }
 VALID_PSEUDO_CLASSES: Final = {
+    "ansi",
     "blur",
     "can-focus",
     "dark",
@@ -70,6 +71,7 @@ VALID_PSEUDO_CLASSES: Final = {
     "hover",
     "inline",
     "light",
+    "nocolor",
 }
 VALID_OVERLAY: Final = {"none", "screen"}
 VALID_CONSTRAIN: Final = {"x", "y", "both", "inflect", "none"}

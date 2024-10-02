@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING
 import rich.repr
 from rich.text import Text
 
-from ..app import ComposeResult
-from ..binding import Binding
-from ..containers import ScrollableContainer
-from ..reactive import reactive
-from ..widget import Widget
+from textual.app import ComposeResult
+from textual.binding import Binding
+from textual.containers import ScrollableContainer
+from textual.reactive import reactive
+from textual.widget import Widget
 
 if TYPE_CHECKING:
-    from ..screen import Screen
+    from textual.screen import Screen
 
 
 @rich.repr.auto
@@ -69,7 +69,7 @@ class FooterKey(Widget):
             .footer-key--description {
                 padding: 0 0 0 1;
             }
-        }
+        }        
     }
     """
 
@@ -147,7 +147,31 @@ class Footer(ScrollableContainer, can_focus=False, can_focus_children=False):
         FooterKey.-command-palette  {
             dock: right;                        
             padding-right: 1;
-            border-left: vkey $foreground 20%;                
+            border-left: vkey $foreground 20%;                            
+        }
+
+        &.-ansi-colors {           
+            background: ansi_default;            
+            .footer-key--key {
+                background: ansi_default;
+                color: ansi_magenta;                
+            }
+            .footer-key--description {
+                background: ansi_default;
+                color: ansi_default;                
+            }
+            FooterKey:hover {
+                text-style: underline;
+                background: ansi_default;
+                color: ansi_default;
+                .footer-key--key {
+                    background: ansi_default;
+                }
+            }        
+            FooterKey.-command-palette {
+                background: ansi_default;
+                border-left: vkey ansi_black;
+            }
         }
     }
     """
@@ -227,15 +251,15 @@ class Footer(ScrollableContainer, can_focus=False, can_focus_children=False):
                     )
                     break
 
-    def on_mount(self) -> None:
-        async def bindings_changed(screen: Screen) -> None:
-            self._bindings_ready = True
-            if not screen.app.app_focus:
-                return
-            if self.is_attached and screen is self.screen:
-                await self.recompose()
+    async def bindings_changed(self, screen: Screen) -> None:
+        self._bindings_ready = True
+        if not screen.app.app_focus:
+            return
+        if self.is_attached and screen is self.screen:
+            await self.recompose()
 
-        self.screen.bindings_updated_signal.subscribe(self, bindings_changed)
+    def on_mount(self) -> None:
+        self.screen.bindings_updated_signal.subscribe(self, self.bindings_changed)
 
     def on_unmount(self) -> None:
         self.screen.bindings_updated_signal.unsubscribe(self)

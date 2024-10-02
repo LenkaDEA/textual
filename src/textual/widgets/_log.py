@@ -4,18 +4,18 @@ import re
 from typing import TYPE_CHECKING, Iterable, Optional, Sequence
 
 from rich.cells import cell_len
-from rich.highlighter import ReprHighlighter
+from rich.highlighter import Highlighter, ReprHighlighter
 from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
 
-from .. import work
-from .._line_split import line_split
-from ..cache import LRUCache
-from ..geometry import Size
-from ..reactive import var
-from ..scroll_view import ScrollView
-from ..strip import Strip
+from textual import work
+from textual._line_split import line_split
+from textual.cache import LRUCache
+from textual.geometry import Size
+from textual.reactive import var
+from textual.scroll_view import ScrollView
+from textual.strip import Strip
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -70,7 +70,7 @@ class Log(ScrollView, can_focus=True):
         self._width = 0
         self._updates = 0
         self._render_line_cache: LRUCache[int, Strip] = LRUCache(1024)
-        self.highlighter = ReprHighlighter()
+        self.highlighter: Highlighter = ReprHighlighter()
         """The Rich Highlighter object to use, if `highlight=True`"""
 
     @property

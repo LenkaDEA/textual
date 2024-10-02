@@ -29,40 +29,43 @@ import rich.repr
 from rich.console import RenderableType
 from rich.style import Style
 
+from textual import constants, errors, events, messages
+from textual._arrange import arrange
+from textual._callback import invoke
+from textual._compositor import Compositor, MapGeometry
+from textual._context import active_message_pump, visible_screen_stack
+from textual._layout import DockArrangeResult
+from textual._path import (
+    CSSPathType,
+    _css_path_type_as_list,
+    _make_path_object_relative,
+)
+from textual._types import CallbackType
+from textual.await_complete import AwaitComplete
+from textual.binding import ActiveBinding, Binding, BindingsMap
+from textual.css.match import match
+from textual.css.parse import parse_selectors
+from textual.css.query import NoMatches, QueryType
+from textual.dom import DOMNode
+from textual.errors import NoWidget
+from textual.geometry import Offset, Region, Size
 from textual.keys import key_to_character
-
-from . import constants, errors, events, messages
-from ._arrange import arrange
-from ._callback import invoke
-from ._compositor import Compositor, MapGeometry
-from ._context import active_message_pump, visible_screen_stack
-from ._layout import DockArrangeResult
-from ._path import CSSPathType, _css_path_type_as_list, _make_path_object_relative
-from ._types import CallbackType
-from .await_complete import AwaitComplete
-from .binding import ActiveBinding, Binding, BindingsMap
-from .css.match import match
-from .css.parse import parse_selectors
-from .css.query import NoMatches, QueryType
-from .dom import DOMNode
-from .errors import NoWidget
-from .geometry import Offset, Region, Size
-from .reactive import Reactive
-from .renderables.background_screen import BackgroundScreen
-from .renderables.blank import Blank
-from .signal import Signal
-from .timer import Timer
-from .widget import Widget
-from .widgets import Tooltip
-from .widgets._toast import ToastRack
+from textual.reactive import Reactive
+from textual.renderables.background_screen import BackgroundScreen
+from textual.renderables.blank import Blank
+from textual.signal import Signal
+from textual.timer import Timer
+from textual.widget import Widget
+from textual.widgets import Tooltip
+from textual.widgets._toast import ToastRack
 
 if TYPE_CHECKING:
     from typing_extensions import Final
 
-    from .command import Provider
+    from textual.command import Provider
 
     # Unused & ignored imports are needed for the docs to link to these objects:
-    from .message_pump import MessagePump
+    from textual.message_pump import MessagePump
 
 # Screen updates will be batched so that they don't happen more often than 60 times per second:
 UPDATE_PERIOD: Final[float] = 1 / constants.MAX_FPS
@@ -153,6 +156,18 @@ class Screen(Generic[ScreenResultType], Widget):
             min-height: 1;
             border-top: tall $background;
             border-bottom: tall $background;
+        }
+
+        &:ansi {
+            background: ansi_default;
+            color: ansi_default;
+
+            &.-screen-suspended {
+                ScrollBar {
+                    text-style: not dim;
+                }
+                text-style: dim;
+            }
         }
     }
     """
@@ -258,7 +273,7 @@ class Screen(Generic[ScreenResultType], Widget):
     @property
     def is_current(self) -> bool:
         """Is the screen current (i.e. visible to user)?"""
-        from .app import ScreenStackError
+        from textual.app import ScreenStackError
 
         try:
             return self.app.screen is self or self in self.app._background_screens
@@ -436,7 +451,7 @@ class Screen(Generic[ScreenResultType], Widget):
         background = self.styles.background
         try:
             base_screen = visible_screen_stack.get().pop()
-        except IndexError:
+        except LookupError:
             base_screen = None
 
         if base_screen is not None and background.a < 1:
@@ -871,6 +886,8 @@ class Screen(Generic[ScreenResultType], Widget):
             self, self._maybe_clear_tooltip, immediate=True
         )
         self.refresh_bindings()
+        # Send this signal so we don't get an initial frame with no bindings in the footer
+        self.bindings_updated_signal.publish(self)
 
     async def _on_idle(self, event: events.Idle) -> None:
         # Check for any widgets marked as 'dirty' (needs a repaint)
@@ -892,7 +909,8 @@ class Screen(Generic[ScreenResultType], Widget):
         finally:
             if self._bindings_updated:
                 self._bindings_updated = False
-                self.app.call_later(self.bindings_updated_signal.publish, self)
+                if self.is_attached and not self.app._exit:
+                    self.app.call_later(self.bindings_updated_signal.publish, self)
 
     def _compositor_refresh(self) -> None:
         """Perform a compositor refresh."""
@@ -978,11 +996,8 @@ class Screen(Generic[ScreenResultType], Widget):
             callbacks = self._callbacks[:]
             self._callbacks.clear()
             for callback, message_pump in callbacks:
-                reset_token = active_message_pump.set(message_pump)
-                try:
+                with message_pump._context():
                     await invoke(callback)
-                finally:
-                    active_message_pump.reset(reset_token)
 
     def _invoke_later(self, callback: CallbackType, sender: MessagePump) -> None:
         """Enqueue a callback to be invoked after the screen is repainted.
@@ -1011,6 +1026,16 @@ class Screen(Generic[ScreenResultType], Widget):
         self._result_callbacks.append(
             ResultCallback[Optional[ScreenResultType]](requester, callback, future)
         )
+
+    async def _message_loop_exit(self) -> None:
+        await super()._message_loop_exit()
+        self._compositor.clear()
+        self._dirty_widgets.clear()
+        self._dirty_regions.clear()
+        self._arrangement_cache.clear()
+        self.screen_layout_refresh_signal.unsubscribe(self)
+        self._nodes._clear()
+        self._task = None
 
     def _pop_result_callback(self) -> None:
         """Remove the latest result callback from the stack."""
@@ -1145,9 +1170,11 @@ class Screen(Generic[ScreenResultType], Widget):
 
     def _on_screen_resume(self) -> None:
         """Screen has resumed."""
+        self.remove_class("-screen-suspended")
         self.stack_updates += 1
         self.app._refresh_notifications()
         size = self.app.size
+
         self._refresh_layout(size)
         self.refresh()
         # Only auto-focus when the app has focus (textual-web only)
@@ -1163,6 +1190,7 @@ class Screen(Generic[ScreenResultType], Widget):
 
     def _on_screen_suspend(self) -> None:
         """Screen has suspended."""
+        self.add_class("-screen-suspended")
         self.app._set_mouse_over(None)
         self._clear_tooltip()
         self.stack_updates += 1
@@ -1433,6 +1461,9 @@ class ModalScreen(Screen[ScreenResultType]):
         layout: vertical;
         overflow-y: auto;
         background: $background 60%;
+        &:ansi {
+            background: transparent;                   
+        }
     }
     """
 

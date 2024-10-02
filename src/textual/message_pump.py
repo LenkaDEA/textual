@@ -15,6 +15,7 @@ import threading
 from asyncio import CancelledError, Queue, QueueEmpty, Task, create_task
 from contextlib import contextmanager
 from functools import partial
+from time import perf_counter
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -28,25 +29,26 @@ from typing import (
 )
 from weakref import WeakSet
 
-from . import Logger, events, log, messages
-from ._callback import invoke
-from ._context import NoActiveAppError, active_app, active_message_pump
-from ._context import message_hook as message_hook_context_var
-from ._context import prevent_message_types_stack
-from ._on import OnNoWidget
-from ._time import time
-from .css.match import match
-from .events import Event
-from .message import Message
-from .reactive import Reactive, TooManyComputesError
-from .signal import Signal
-from .timer import Timer, TimerCallback
+from textual import Logger, events, log, messages
+from textual._callback import invoke
+from textual._context import NoActiveAppError, active_app, active_message_pump
+from textual._context import message_hook as message_hook_context_var
+from textual._context import prevent_message_types_stack
+from textual._on import OnNoWidget
+from textual._time import time
+from textual.constants import SLOW_THRESHOLD
+from textual.css.match import match
+from textual.events import Event
+from textual.message import Message
+from textual.reactive import Reactive, TooManyComputesError
+from textual.signal import Signal
+from textual.timer import Timer, TimerCallback
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
 
-    from .app import App
-    from .css.model import SelectorSet
+    from textual.app import App
+    from textual.css.model import SelectorSet
 
 
 Callback: TypeAlias = "Callable[..., Any] | Callable[..., Awaitable[Any]]"
@@ -222,14 +224,14 @@ class MessagePump(metaclass=_MessagePumpMeta):
         try:
             return active_app.get()
         except LookupError:
-            from .app import App
+            from textual.app import App
 
             node: MessagePump | None = self
             while not isinstance(node, App):
                 if node is None:
                     raise NoActiveAppError()
                 node = node._parent
-            active_app.set(node)
+
             return node
 
     @property
@@ -501,24 +503,26 @@ class MessagePump(metaclass=_MessagePumpMeta):
 
     async def _process_messages(self) -> None:
         self._running = True
-        active_message_pump.set(self)
 
-        if not await self._pre_process():
-            self._running = False
-            return
+        with self._context():
+            if not await self._pre_process():
+                self._running = False
+                return
 
-        try:
-            await self._process_messages_loop()
-        except CancelledError:
-            pass
-        finally:
-            self._running = False
             try:
-                if self._timers:
-                    await Timer._stop_all(self._timers)
-                    self._timers.clear()
+                await self._process_messages_loop()
+            except CancelledError:
+                pass
             finally:
-                await self._message_loop_exit()
+                self._running = False
+                try:
+                    if self._timers:
+                        await Timer._stop_all(self._timers)
+                        self._timers.clear()
+                    Reactive._clear_watchers(self)
+                finally:
+                    await self._message_loop_exit()
+        self._task = None
 
     async def _message_loop_exit(self) -> None:
         """Called when the message loop has completed."""
@@ -557,6 +561,15 @@ class MessagePump(metaclass=_MessagePumpMeta):
     def _close_messages_no_wait(self) -> None:
         """Request the message queue to immediately exit."""
         self._message_queue.put_nowait(messages.CloseMessages())
+
+    @contextmanager
+    def _context(self) -> Generator[None, None, None]:
+        """Context manager to set ContextVars."""
+        reset_token = active_message_pump.set(self)
+        try:
+            yield
+        finally:
+            active_message_pump.reset(reset_token)
 
     async def _on_close_messages(self, message: messages.CloseMessages) -> None:
         await self._close_messages()
@@ -655,6 +668,16 @@ class MessagePump(metaclass=_MessagePumpMeta):
             # Allow apps to treat events and messages separately
             if isinstance(message, Event):
                 await self.on_event(message)
+            elif "debug" in self.app.features:
+                start = perf_counter()
+                await self._on_message(message)
+                if perf_counter() - start > SLOW_THRESHOLD / 1000:
+                    log.warning(
+                        f"method=<{self.__class__.__name__}."
+                        f"{message.handler_name}>",
+                        f"Took over {SLOW_THRESHOLD}ms to process.",
+                        "\nTo avoid screen freezes, consider using a worker.",
+                    )
             else:
                 await self._on_message(message)
             if self._next_callbacks:
@@ -669,7 +692,7 @@ class MessagePump(metaclass=_MessagePumpMeta):
             method_name: Handler method name.
             message: Message object.
         """
-        from .widget import Widget
+        from textual.widget import Widget
 
         methods_dispatched: set[Callable] = set()
         message_mro = [

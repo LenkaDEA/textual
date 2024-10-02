@@ -43,32 +43,32 @@ from rich.text import Text
 from typing_extensions import Self
 
 if TYPE_CHECKING:
-    from .app import RenderResult
+    from textual.app import RenderResult
 
-from . import constants, errors, events, messages
-from ._animator import DEFAULT_EASING, Animatable, BoundAnimator, EasingFunction
-from ._arrange import DockArrangeResult, arrange
-from ._compose import compose
-from ._context import NoActiveAppError, active_app
-from ._debug import get_caller_file_and_line
-from ._dispatch_key import dispatch_key
-from ._easing import DEFAULT_SCROLL_EASING
-from ._layout import Layout
-from ._segment_tools import align_lines
-from ._styles_cache import StylesCache
-from ._types import AnimationLevel
-from .actions import SkipAction
-from .await_complete import AwaitComplete
-from .await_remove import AwaitRemove
-from .box_model import BoxModel
-from .cache import FIFOCache
-from .color import Color
-from .css.match import match
-from .css.parse import parse_selectors
-from .css.query import NoMatches, WrongType
-from .css.scalar import ScalarOffset
-from .dom import DOMNode, NoScreen
-from .geometry import (
+from textual import constants, errors, events, messages
+from textual._animator import DEFAULT_EASING, Animatable, BoundAnimator, EasingFunction
+from textual._arrange import DockArrangeResult, arrange
+from textual._compose import compose
+from textual._context import NoActiveAppError
+from textual._debug import get_caller_file_and_line
+from textual._dispatch_key import dispatch_key
+from textual._easing import DEFAULT_SCROLL_EASING
+from textual._layout import Layout
+from textual._segment_tools import align_lines
+from textual._styles_cache import StylesCache
+from textual._types import AnimationLevel
+from textual.actions import SkipAction
+from textual.await_complete import AwaitComplete
+from textual.await_remove import AwaitRemove
+from textual.box_model import BoxModel
+from textual.cache import FIFOCache
+from textual.color import Color
+from textual.css.match import match
+from textual.css.parse import parse_selectors
+from textual.css.query import NoMatches, WrongType
+from textual.css.scalar import ScalarOffset
+from textual.dom import DOMNode, NoScreen
+from textual.geometry import (
     NULL_REGION,
     NULL_SIZE,
     NULL_SPACING,
@@ -78,21 +78,21 @@ from .geometry import (
     Spacing,
     clamp,
 )
-from .layouts.vertical import VerticalLayout
-from .message import Message
-from .messages import CallbackType, Prune
-from .notifications import SeverityLevel
-from .reactive import Reactive
-from .render import measure
-from .renderables.blank import Blank
-from .rlock import RLock
-from .strip import Strip
+from textual.layouts.vertical import VerticalLayout
+from textual.message import Message
+from textual.messages import CallbackType, Prune
+from textual.notifications import SeverityLevel
+from textual.reactive import Reactive
+from textual.render import measure
+from textual.renderables.blank import Blank
+from textual.rlock import RLock
+from textual.strip import Strip
 
 if TYPE_CHECKING:
-    from .app import App, ComposeResult
-    from .css.query import QueryType
-    from .message_pump import MessagePump
-    from .scrollbar import (
+    from textual.app import App, ComposeResult
+    from textual.css.query import QueryType
+    from textual.message_pump import MessagePump
+    from textual.scrollbar import (
         ScrollBar,
         ScrollBarCorner,
         ScrollDown,
@@ -293,6 +293,7 @@ class Widget(DOMNode):
         link-background-hover: $accent;
         link-color-hover: $text;
         link-style-hover: bold not underline;
+        background: transparent;
     }
     """
     COMPONENT_CLASSES: ClassVar[set[str]] = set()
@@ -412,7 +413,7 @@ class Widget(DOMNode):
                     f"Widget positional arguments must be Widget subclasses; not {child!r}"
                 )
         self._pending_children = list(children)
-        self.disabled = disabled
+        self.set_reactive(Widget.disabled, disabled)
         if self.BORDER_TITLE:
             self.border_title = self.BORDER_TITLE
         if self.BORDER_SUBTITLE:
@@ -446,7 +447,10 @@ class Widget(DOMNode):
     """The scroll position on the Y axis."""
 
     scroll_target_x = Reactive(0.0, repaint=False)
+    """Scroll target destination, X coord."""
+
     scroll_target_y = Reactive(0.0, repaint=False)
+    """Scroll target destination, Y coord."""
 
     show_vertical_scrollbar: Reactive[bool] = Reactive(False, layout=True)
     """Show a vertical scrollbar?"""
@@ -1194,9 +1198,10 @@ class Widget(DOMNode):
             return
 
         async with self.batch():
-            await self.query("*").exclude(".-textual-system").remove()
+            await self.query_children("*").exclude(".-textual-system").remove()
             if self.is_attached:
-                await self.mount_all(compose(self))
+                compose_nodes = compose(self)
+                await self.mount_all(compose_nodes)
 
     def _post_register(self, app: App) -> None:
         """Called when the instance is registered.
@@ -1515,7 +1520,7 @@ class Widget(DOMNode):
         Returns:
             ScrollBarCorner Widget.
         """
-        from .scrollbar import ScrollBarCorner
+        from textual.scrollbar import ScrollBarCorner
 
         if self._scrollbar_corner is not None:
             return self._scrollbar_corner
@@ -1533,7 +1538,7 @@ class Widget(DOMNode):
         Returns:
             ScrollBar Widget.
         """
-        from .scrollbar import ScrollBar
+        from textual.scrollbar import ScrollBar
 
         if self._vertical_scrollbar is not None:
             return self._vertical_scrollbar
@@ -1555,7 +1560,7 @@ class Widget(DOMNode):
             ScrollBar Widget.
         """
 
-        from .scrollbar import ScrollBar
+        from textual.scrollbar import ScrollBar
 
         if self._horizontal_scrollbar is not None:
             return self._horizontal_scrollbar
@@ -1883,7 +1888,7 @@ class Widget(DOMNode):
         Returns:
             A Rich console object.
         """
-        return active_app.get().console
+        return self.app.console
 
     @property
     def _has_relative_children_width(self) -> bool:
@@ -2816,7 +2821,7 @@ class Widget(DOMNode):
 
         while isinstance(widget.parent, Widget) and widget is not self:
             container = widget.parent
-            if widget.styles.dock:
+            if widget.styles.dock != "none":
                 scroll_offset = Offset(0, 0)
             else:
                 scroll_offset = container.scroll_to_region(
@@ -2869,6 +2874,8 @@ class Widget(DOMNode):
         force: bool = False,
         on_complete: CallbackType | None = None,
         level: AnimationLevel = "basic",
+        x_axis: bool = True,
+        y_axis: bool = True,
     ) -> Offset:
         """Scrolls a given region in to view, if required.
 
@@ -2887,6 +2894,8 @@ class Widget(DOMNode):
             force: Force scrolling even when prohibited by overflow styling.
             on_complete: A callable to invoke when the animation is finished.
             level: Minimum level required for the animation to take place (inclusive).
+            x_axis: Allow scrolling on X axis?
+            y_axis: Allow scrolling on Y axis?
 
         Returns:
             The distance that was scrolled.
@@ -2933,11 +2942,13 @@ class Widget(DOMNode):
             delta = Offset(delta.x, 0)
 
         if delta:
+            delta_x = delta.x if x_axis else 0
+            delta_y = delta.y if y_axis else 0
             if speed is None and duration is None:
                 duration = 0.2
             self.scroll_relative(
-                delta.x or None,
-                delta.y or None,
+                delta_x or None,
+                delta_y or None,
                 animate=animate,
                 speed=speed,
                 duration=duration,
@@ -3194,6 +3205,7 @@ class Widget(DOMNode):
         Returns:
             Names of the pseudo classes.
         """
+        app = self.app
         if self.mouse_hover:
             yield "hover"
         if self.has_focus:
@@ -3215,7 +3227,7 @@ class Widget(DOMNode):
         except NoScreen:
             pass
         else:
-            yield "dark" if self.app.dark else "light"
+            yield "dark" if app.dark else "light"
             if focused:
                 node = focused
                 while node is not None:
@@ -3223,8 +3235,13 @@ class Widget(DOMNode):
                         yield "focus-within"
                         break
                     node = node._parent
-        if self.app.is_inline:
+
+        if app.is_inline:
             yield "inline"
+        if app.ansi_color:
+            yield "ansi"
+        if app.no_color:
+            yield "nocolor"
 
     def get_pseudo_class_state(self) -> PseudoClasses:
         """Get an object describing whether each pseudo class is present on this object or not.
@@ -3297,7 +3314,7 @@ class Widget(DOMNode):
 
     def watch_disabled(self, disabled: bool) -> None:
         """Update the styles of the widget and its children when disabled is toggled."""
-        from .app import ScreenStackError
+        from textual.app import ScreenStackError
 
         if disabled and self.mouse_hover and self.app.mouse_over is not None:
             # Ensure widget gets a Leave if it is disabled while hovered
@@ -3676,6 +3693,11 @@ class Widget(DOMNode):
         parent._nodes._remove(self)
         self.app._registry.discard(self)
         self._detach()
+        self._arrangement_cache.clear()
+        self._nodes._clear()
+        self._render_cache = _RenderCache(NULL_SIZE, [])
+        self._component_styles.clear()
+        self._query_one_cache.clear()
 
     async def _on_idle(self, event: events.Idle) -> None:
         """Called when there are no more events on the queue.

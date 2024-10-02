@@ -13,11 +13,11 @@ from typing import Any, Awaitable, Callable, Iterable, Union
 
 from rich.repr import Result, rich_repr
 
-from . import _time, events
-from ._callback import invoke
-from ._context import active_app
-from ._time import sleep
-from ._types import MessageTarget
+from textual import _time, events
+from textual._callback import invoke
+from textual._context import active_app
+from textual._time import sleep
+from textual._types import MessageTarget
 
 TimerCallback = Union[Callable[[], Awaitable[Any]], Callable[[], Any]]
 """Type of valid callbacks to be used with timers."""
@@ -84,7 +84,7 @@ class Timer:
         """Start the timer."""
         self._task = create_task(self._run_timer(), name=self.name)
 
-    def stop(self) -> Task:
+    def stop(self) -> None:
         """Stop the timer.
 
         Returns:
@@ -92,15 +92,11 @@ class Timer:
 
         """
         if self._task is None:
-
-            async def noop() -> None:
-                """A dummy task."""
-
-            return create_task(noop())
+            return
 
         self._active.set()
         self._task.cancel()
-        return self._task
+        self._task = None
 
     @classmethod
     async def _stop_all(cls, timers: Iterable[Timer]) -> None:
@@ -123,6 +119,7 @@ class Timer:
                     await timer._task
                 except CancelledError:
                     pass
+                timer._task = None
 
         await gather(*[stop_timer(timer) for timer in list(timers)])
 

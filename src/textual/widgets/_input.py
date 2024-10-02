@@ -12,32 +12,31 @@ from rich.segment import Segment
 from rich.text import Text
 from typing_extensions import Literal
 
-from .. import events
-from .._segment_tools import line_crop
+from textual import events
+from textual._segment_tools import line_crop
 
 if TYPE_CHECKING:
-    from ..app import RenderResult
+    from textual.app import RenderResult
 
-from ..binding import Binding, BindingType
-from ..css._error_tools import friendly_list
-from ..events import Blur, Focus, Mount
-from ..geometry import Offset, Size
-from ..message import Message
-from ..reactive import Reactive, reactive, var
-from ..suggester import Suggester, SuggestionReady
-from ..timer import Timer
-from ..validation import ValidationResult, Validator
-from ..widget import Widget
+from textual.binding import Binding, BindingType
+from textual.css._error_tools import friendly_list
+from textual.events import Blur, Focus, Mount
+from textual.geometry import Offset, Size
+from textual.message import Message
+from textual.reactive import Reactive, reactive, var
+from textual.suggester import Suggester, SuggestionReady
+from textual.timer import Timer
+from textual.validation import ValidationResult, Validator
+from textual.widget import Widget
 
 InputValidationOn = Literal["blur", "changed", "submitted"]
 """Possible messages that trigger input validation."""
 _POSSIBLE_VALIDATE_ON_VALUES = {"blur", "changed", "submitted"}
 """Set literal with the legal values for the type `InputValidationOn`."""
 
-
 _RESTRICT_TYPES = {
-    "integer": r"[-+]?\d*",
-    "number": r"[-+]?\d*\.?\d*[eE]?[-+]?\d*",
+    "integer": r"[-+]?(?:\d*|\d+_)*",
+    "number": r"[-+]?(?:\d*|\d+_)*\.?(?:\d*|\d+_)*(?:\d[eE]?[-+]?(?:\d*|\d+_)*)?",
     "text": None,
 }
 InputType = Literal["integer", "number", "text"]
@@ -151,24 +150,51 @@ class Input(Widget, can_focus=True):
         border: tall $background;
         width: 100%;
         height: 3;
+
+        &:focus {
+            border: tall $accent;
+        }
+        &>.input--cursor {
+            background: $surface;
+            color: $text;
+            text-style: reverse;
+        }
+        &>.input--placeholder, &>.input--suggestion {
+            color: $text-disabled;
+        }
+        &.-invalid {
+            border: tall $error 60%;
+        }
+        &.-invalid:focus {
+            border: tall $error;
+        }    
+
+        &.-ansi-colors {
+            background: ansi_default;
+            color: ansi_default;
+            border: tall ansi_default;
+
+            &:focus {
+                border: tall ansi_blue;
+            }
+            &>.input--cursor {     
+                background: ansi_default;           
+                text-style: reverse;
+            }
+            &>.input--placeholder, &>.input--suggestion {
+                text-style: dim;
+                color: ansi_default;
+            }
+            &.-invalid {
+                border: tall ansi_red;
+            }
+            &.-invalid:focus {
+                border: tall ansi_red;
+            }  
+            
+        }
     }
-    Input:focus {
-        border: tall $accent;
-    }
-    Input>.input--cursor {
-        background: $surface;
-        color: $text;
-        text-style: reverse;
-    }
-    Input>.input--placeholder, Input>.input--suggestion {
-        color: $text-disabled;
-    }
-    Input.-invalid {
-        border: tall $error 60%;
-    }
-    Input.-invalid:focus {
-        border: tall $error;
-    }
+
     """
 
     cursor_blink = reactive(True, init=False)
@@ -328,7 +354,7 @@ class Input(Widget, can_focus=True):
         self.type = type
         self.max_length = max_length
         if not self.validators:
-            from ..validation import Integer, Number
+            from textual.validation import Integer, Number
 
             if self.type == "integer":
                 self.validators.append(Integer())

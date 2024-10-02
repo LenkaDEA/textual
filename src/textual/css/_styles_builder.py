@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from functools import lru_cache
-from typing import Iterable, NoReturn, Sequence, cast
+from typing import Iterable, NoReturn, cast
 
 import rich.repr
 
-from .._border import BorderValue, normalize_border_value
-from .._cells import cell_len
-from .._duration import _duration_as_seconds
-from .._easing import EASING
-from ..color import TRANSPARENT, Color, ColorParseError
-from ..geometry import Spacing, SpacingDimensions, clamp
-from ..suggestions import get_suggestion
-from ._error_tools import friendly_list
-from ._help_renderables import HelpText
-from ._help_text import (
+from textual._border import BorderValue, normalize_border_value
+from textual._cells import cell_len
+from textual._duration import _duration_as_seconds
+from textual._easing import EASING
+from textual.color import TRANSPARENT, Color, ColorParseError
+from textual.css._error_tools import friendly_list
+from textual.css._help_renderables import HelpText
+from textual.css._help_text import (
     align_help_text,
     border_property_help_text,
     color_property_help_text,
@@ -37,7 +34,7 @@ from ._help_text import (
     table_rows_or_columns_help_text,
     text_align_help_text,
 )
-from .constants import (
+from textual.css.constants import (
     HATCHES,
     VALID_ALIGN_HORIZONTAL,
     VALID_ALIGN_VERTICAL,
@@ -55,9 +52,9 @@ from .constants import (
     VALID_TEXT_ALIGN,
     VALID_VISIBILITY,
 )
-from .errors import DeclarationError, StyleValueError
-from .model import Declaration
-from .scalar import (
+from textual.css.errors import DeclarationError, StyleValueError
+from textual.css.model import Declaration
+from textual.css.scalar import (
     Scalar,
     ScalarError,
     ScalarOffset,
@@ -65,10 +62,12 @@ from .scalar import (
     Unit,
     percentage_string_to_float,
 )
-from .styles import Styles
-from .tokenize import Token
-from .transition import Transition
-from .types import BoxSizing, Display, EdgeType, Overflow, Visibility
+from textual.css.styles import Styles
+from textual.css.tokenize import Token
+from textual.css.transition import Transition
+from textual.css.types import BoxSizing, Display, EdgeType, Overflow, Visibility
+from textual.geometry import Spacing, SpacingDimensions, clamp
+from textual.suggestions import get_suggestion
 
 
 class StylesBuilder:
@@ -136,19 +135,6 @@ class StylesBuilder:
             raise
         except Exception as error:
             self.error(declaration.name, declaration.token, str(error))
-
-    @lru_cache(maxsize=None)
-    def _get_processable_rule_names(self) -> Sequence[str]:
-        """
-        Returns the list of CSS properties we can manage -
-        i.e. the ones for which we have a `process_[property name]` method
-
-        Returns:
-            All the "Python-ised" CSS property names this class can handle.
-
-        Example: ("width", "background", "offset_x", ...)
-        """
-        return [attr[8:] for attr in dir(self) if attr.startswith("process_")]
 
     def _process_enum_multiple(
         self, name: str, tokens: list[Token], valid_values: set[str], count: int
@@ -571,7 +557,7 @@ class StylesBuilder:
             elif token.name == "token":
                 try:
                     keyline_color = Color.parse(token.value)
-                except Exception as error:
+                except Exception:
                     keyline_style = token.value
                     if keyline_style not in VALID_KEYLINE:
                         self.error(name, token, keyline_help_text())
@@ -625,7 +611,7 @@ class StylesBuilder:
             self.styles._rules["offset"] = ScalarOffset(x, y)
 
     def process_layout(self, name: str, tokens: list[Token]) -> None:
-        from ..layouts.factory import MissingLayout, get_layout
+        from textual.layouts.factory import MissingLayout, get_layout
 
         if tokens:
             if len(tokens) != 1:
@@ -746,8 +732,8 @@ class StylesBuilder:
                 dock_property_help_text(name, context="css"),
             )
 
-        dock = tokens[0].value
-        self.styles._rules["dock"] = dock
+        dock_value = tokens[0].value
+        self.styles._rules["dock"] = dock_value
 
     def process_split(self, name: str, tokens: list[Token]) -> None:
         if not tokens:
@@ -760,8 +746,8 @@ class StylesBuilder:
                 split_property_help_text(name, context="css"),
             )
 
-        dock = tokens[0].value
-        self.styles._rules["split"] = dock
+        split_value = tokens[0].value
+        self.styles._rules["split"] = split_value
 
     def process_layer(self, name: str, tokens: list[Token]) -> None:
         if len(tokens) > 1:
@@ -1079,6 +1065,10 @@ class StylesBuilder:
         color = TRANSPARENT
         opacity = 1.0
 
+        if len(tokens) == 1 and tokens[0].value == "none":
+            self.styles._rules[name] = "none"
+            return
+
         if len(tokens) not in (2, 3):
             self.error(name, tokens[0], "2 or 3 values expected here")
 
@@ -1154,4 +1144,7 @@ class StylesBuilder:
 
         Example: returns "background" for rule_name "bkgrund", "offset_x" for "ofset_x"
         """
-        return get_suggestion(rule_name, self._get_processable_rule_names())
+        processable_rules_name = [
+            attr[8:] for attr in dir(self) if attr.startswith("process_")
+        ]
+        return get_suggestion(rule_name, processable_rules_name)

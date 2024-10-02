@@ -7,18 +7,19 @@ import rich.repr
 from rich.console import RenderableType
 from rich.text import Text
 
-from .. import events, on
-from ..containers import Horizontal, Vertical
-from ..css.query import NoMatches
-from ..message import Message
-from ..reactive import var
-from ..widgets import Static
-from ._option_list import Option, OptionList
+from textual import events, on
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
+from textual.message import Message
+from textual.reactive import var
+from textual.widgets import Static
+from textual.widgets._option_list import Option, OptionList
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
 
-    from ..app import ComposeResult
+    from textual.app import ComposeResult
 
 
 class NoSelection:
@@ -198,7 +199,9 @@ class Select(Generic[SelectType], Vertical, can_focus=True):
     BLANK = BLANK
     """Constant to flag that the widget has no selection."""
 
-    BINDINGS = [("enter,down,space,up", "show_overlay")]
+    BINDINGS = [
+        Binding("enter,down,space,up", "show_overlay", show=False),
+    ]
     """
     | Key(s) | Description |
     | :- | :- |

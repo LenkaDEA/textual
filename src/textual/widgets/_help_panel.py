@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from ..app import ComposeResult
-from ..css.query import NoMatches
-from ..widget import Widget
-from ..widgets import KeyPanel, Label, Markdown
+from textual.app import ComposeResult
+from textual.css.query import NoMatches
+from textual.widget import Widget
+from textual.widgets import KeyPanel, Label, Markdown
 
 
 class HelpPanel(Widget):
@@ -26,6 +26,18 @@ class HelpPanel(Widget):
         padding-right: 1;
         layout: vertical;
         height: 100%;
+
+        &:ansi {
+            background: ansi_default;
+            border-left: vkey ansi_black;
+
+            Markdown, KeyPanel {
+                background: ansi_default;
+            }
+            .bindings-table--divide {
+                color: transparent;
+            }
+        }
       
         #title {
             width: 1fr;
@@ -45,6 +57,10 @@ class HelpPanel(Widget):
             margin-top: 1;
             display: none;
             background: $panel;
+
+            &:ansi {
+                background: ansi_default;
+            }
 
             MarkdownBlock {
                 padding-left: 2;
