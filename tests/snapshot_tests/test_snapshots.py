@@ -8,27 +8,28 @@ from tests.snapshot_tests.language_snippets import SNIPPETS
 from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding, Keymap
-from textual.containers import Center, Grid, Middle, Vertical
-from textual.binding import Binding
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import Center, Container, Grid, Middle, Vertical, VerticalScroll
 from textual.pilot import Pilot
 from textual.renderables.gradient import LinearGradient
 from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Button,
-    Header,
     DataTable,
-    Input,
-    RichLog,
-    TextArea,
     Footer,
+    Header,
+    Input,
+    Label,
     Log,
     OptionList,
     Placeholder,
+    ProgressBar,
+    RadioSet,
+    RichLog,
     SelectionList,
+    Static,
+    Switch,
+    TextArea,
 )
-from textual.widgets import ProgressBar, Label, Switch
-from textual.widgets import Static
 from textual.widgets.text_area import BUILTIN_LANGUAGES, Selection, TextAreaTheme
 
 # These paths should be relative to THIS directory.
@@ -329,6 +330,23 @@ def test_radio_button_example(snap_compare):
 
 def test_radio_set_example(snap_compare):
     assert snap_compare(WIDGET_EXAMPLES_DIR / "radio_set.py")
+
+
+def test_radio_set_is_scrollable(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5100"""
+
+    class RadioSetApp(App):
+        CSS = """
+        RadioSet {
+            height: 5;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            yield RadioSet(*[(f"This is option #{n}") for n in range(10)])
+
+    app = RadioSetApp()
+    assert snap_compare(app, press=["up"])
 
 
 def test_content_switcher_example_initial(snap_compare):
@@ -652,7 +670,8 @@ def test_richlog_width(snap_compare):
 def test_richlog_min_width(snap_compare):
     """The available space of this RichLog is less than the minimum width, so written
     content should be rendered at `min_width`. This snapshot should show the renderable
-    clipping at the right edge, as there's not enough space to satisfy the minimum width."""
+    clipping at the right edge, as there's not enough space to satisfy the minimum width.
+    """
 
     class RichLogMinWidth20(App[None]):
         def compose(self) -> ComposeResult:
@@ -2292,3 +2311,118 @@ def test_maximize_allow(snap_compare):
             yield Footer()  # Not allowed
 
     assert snap_compare(MaximizeApp(), press=["m"])
+
+
+def test_background_tint(snap_compare):
+    """Test background tint with alpha."""
+
+    # The screen background is dark blue
+    # The vertical is 20% white
+    # With no background tint, the verticals will be a light blue
+    # With a 100% tint, the vertical should be 20% red plus the blue (i.e. purple)
+
+    # tl;dr you should see 4 bars, blue at the top, purple at the bottom, and two shades in between
+
+    class BackgroundTintApp(App):
+        CSS = """
+        Screen {
+            background: rgb(0,0,100)
+        }
+        Vertical {
+            background: rgba(255,255,255,0.2);
+        }
+        #tint1 { background-tint: rgb(255,0,0) 0%; }
+        #tint2 { background-tint: rgb(255,0,0) 33%; }
+        #tint3 { background-tint: rgb(255,0,0) 66%; }
+        #tint4 { background-tint: rgb(255,0,0) 100% }
+        """
+
+        def compose(self) -> ComposeResult:
+            with Vertical(id="tint1"):
+                yield Label("0%")
+            with Vertical(id="tint2"):
+                yield Label("33%")
+            with Vertical(id="tint3"):
+                yield Label("66%")
+            with Vertical(id="tint4"):
+                yield Label("100%")
+
+    assert snap_compare(BackgroundTintApp())
+
+
+def test_fr_and_margin(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5116"""
+
+    # Check margins can be independently applied to widgets with fr unites
+
+    class FRApp(App):
+        CSS = """
+        #first-container {            
+            background: green;
+            height: auto;
+        }
+
+        #second-container {
+            margin: 2;
+            background: red;
+            height: auto;        
+        }
+
+        #third-container {
+            margin: 4;
+            background: blue;
+            height: auto;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            with Container(id="first-container"):
+                yield Label("No margin - should extend to left and right")
+
+            with Container(id="second-container"):
+                yield Label("A margin of 2, should be 2 cells around the text")
+
+            with Container(id="third-container"):
+                yield Label("A margin of 4, should be 4 cells around the text")
+
+    assert snap_compare(FRApp())
+
+
+def test_pseudo_classes(snap_compare):
+    """Test pseudo classes added in https://github.com/Textualize/textual/pull/5139
+
+    You should see 6 bars, with alternating green and red backgrounds.
+
+    The first bar should have a red border.
+
+    The last bar should have a green border.
+
+    """
+
+    class PSApp(App):
+        CSS = """
+        Label { width: 1fr; height: 1fr; }
+        Label:first-of-type { border:heavy red; }
+        Label:last-of-type { border:heavy green; }
+        Label:odd {background: $success 20%; }
+        Label:even {background: $error 20%; }
+        """
+
+        def compose(self) -> ComposeResult:
+            for item_number in range(5):
+                yield Label(f"Item {item_number+1}")
+
+        def on_mount(self) -> None:
+            # Mounting a new widget should updated previous widgets, as the last of type has changed
+            self.mount(Label("HELLO"))
+
+    assert snap_compare(PSApp())
+
+
+def test_split_segments_infinite_loop(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5151
+
+    Should be a bare-bones text editor containing "x"
+
+    """
+    assert snap_compare(SNAPSHOT_APPS_DIR / "split_segments.py")
