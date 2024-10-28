@@ -1,0 +1,22 @@
+From 9930c019d47acf840daffa2c9897a98a7e48236d Mon Sep 17 00:00:00 2001
+From: Elena Dyatlenko <lenka@altlinux.org>
+Date: Tue, 29 Oct 2024 16:41:02 +0300
+Subject: [PATCH] fix: dependencies
+
+---
+ src/textual/demo/__main__.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/textual/demo/__main__.py b/src/textual/demo/__main__.py
+index d254f85c4..9da832d96 100644
+--- a/src/textual/demo/__main__.py
++++ b/src/textual/demo/__main__.py
+@@ -1,4 +1,4 @@
+-from textual.demo2.demo_app import DemoApp
++from textual.demo.demo_app import DemoApp
+ 
+ if __name__ == "__main__":
+     app = DemoApp()
+-- 
+2.42.2
+

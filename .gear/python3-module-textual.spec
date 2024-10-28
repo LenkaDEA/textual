@@ -7,16 +7,18 @@
 %define docdir %_docdir/%name-doc-%version
 
 Name: python3-module-%modulename
-Version: 0.84.0
+Version: 0.85.1
 Release: alt1
 
 Summary: Textual is a Rapid Application Development framework for Python
 License: MIT
-Group: Terminals
-Url: https://textual.textualize.io/
+Group: Development/Python3
+Url: https://pypi.org/project/textual/
 Vcs: https://github.com/Textualize/textual.git
 BuildArch: noarch
 Source: %name-%version.tar
+
+Patch0: %name-%version-dependencies.patch
 
 BuildRequires(pre): rpm-build-python3
 BuildRequires: python3-module-poetry
@@ -52,11 +54,17 @@ interfaces with a simple Python API.
 # for windows
 rm src/textual/drivers/win32.py
 
+%patch0 -p1
+
 %build
 %pyproject_build
 
 %install
 %pyproject_install
+
+# Package documentation files
+mkdir -p %buildroot%docdir
+cp -a examples docs %buildroot%docdir
 
 # test_snapshots needs GUI mode, tested locally
 # In test_input_value_visibility broken "value"
@@ -64,11 +72,6 @@ rm src/textual/drivers/win32.py
 # test_register_language, test_register_language_existing_language,
 # test_language_binary_missing no module tree_sitter_languages
 # https://github.com/grantjenks/py-tree-sitter-languages
-
-# Package documentation files
-mkdir -p %buildroot%docdir
-cp -a README.md examples docs %buildroot%docdir
-
 %check
 %pyproject_run_pytest -ra -Wignore \
     -ra tests -k "\
@@ -82,12 +85,18 @@ cp -a README.md examples docs %buildroot%docdir
 %files
 %python3_sitelibdir/%modulename
 %python3_sitelibdir/%modulename-%version.dist-info
+%doc README.md LICENSE
 
 %files -n %name-doc
 %docdir
 %exclude %docdir/docs/blog
 
 %changelog
+* Mon Oct 28 2024 Elena Dyatlenko <lenka@altlinux.org> 0.85.1-alt1
+- Updated to upstream version v0.85.1.
+- Group change to Development/Python3.
+- Url change to pypi.
+
 * Fri Oct 25 2024 Elena Dyatlenko <lenka@altlinux.org> 0.84.0-alt1
 - Updated to upstream version v0.84.0.
 
