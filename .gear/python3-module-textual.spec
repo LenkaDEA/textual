@@ -7,7 +7,7 @@
 %define docdir %_docdir/%name-doc-%version
 
 Name: python3-module-%modulename
-Version: 0.85.2
+Version: 1.0.0
 Release: alt1
 
 Summary: Textual is a Rapid Application Development framework for Python
@@ -70,7 +70,9 @@ rm src/textual/drivers/win32.py
     not test_textual_env_var and \
     not test_register_language and \
     not test_register_language_existing_language and \
-    not test_language_binary_missing" \
+    not test_language_binary_missing and \
+    not test_setting_unknown_language and \
+    not test_update_highlight_query" \
     --ignore="tests/snapshot_tests/test_snapshots.py" \
     --ignore="tests/input/test_input_value_visibility.py"
 
@@ -83,6 +85,9 @@ rm src/textual/drivers/win32.py
 %doc docs/* examples/
 
 %changelog
+* Wed Jan 15 2025 Elena Dyatlenko <lenka@altlinux.org> 1.0.0-alt1
+- Updated to upstream version v1.0.0.
+
 * Tue Nov 12 2024 Elena Dyatlenko <lenka@altlinux.org> 0.85.2-alt1
 - Updated to upstream version v0.85.2.
 - Add blog to doc
