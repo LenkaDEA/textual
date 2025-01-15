@@ -22,7 +22,9 @@ from textual.widgets import Footer, Header, Input, Markdown
 try:
     import llm
 except ImportError:
-    raise ImportError("install the 'llm' package or run with 'uv run mother.py'")
+    raise ImportError(
+        "install the 'llm' package or run with 'uv run mother.py'"
+    ) from None
 
 # The system prompt
 SYSTEM = """Formulate all responses as if you where the sentient AI named Mother from the Alien movies."""
@@ -81,11 +83,13 @@ class MotherApp(App):
         await chat_view.mount(Prompt(event.value))
         await chat_view.mount(response := Response())
         response.anchor()
+
         self.send_prompt(event.value, response)
 
     @work(thread=True)
     def send_prompt(self, prompt: str, response: Response) -> None:
         """Get the response in a thread."""
+
         response_content = ""
         llm_response = self.model.prompt(prompt, system=SYSTEM)
         for chunk in llm_response:

@@ -5,6 +5,180 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.0.0] - 2024-12-12
+
+### Added
+
+- Added `App.clipboard` https://github.com/Textualize/textual/pull/5352
+- Added standard cut/copy/paste (ctrl+x, ctrl+c, ctrl+v) bindings to Input / TextArea https://github.com/Textualize/textual/pull/5352 & https://github.com/Textualize/textual/pull/5374
+- Added `system` boolean to Binding, which hides the binding from the help panel https://github.com/Textualize/textual/pull/5352
+- Added support for double/triple/etc clicks via `chain` attribute on `Click` events https://github.com/Textualize/textual/pull/5369
+- Added `times` parameter to `Pilot.click` method, for simulating rapid clicks https://github.com/Textualize/textual/pull/5369
+  
+### Changed
+
+- Breaking change: Change default quit key to `ctrl+q` https://github.com/Textualize/textual/pull/5352
+- The command palette will now select the top item automatically https://github.com/Textualize/textual/pull/5361
+- `ctrl+shift+k` now deletes the current line in `TextArea`, and `ctrl+x` will cut
+the selection if there is one, otherwise it will cut the current line https://github.com/Textualize/textual/pull/5374
+- Implemented a better matching algorithm for the command palette https://github.com/Textualize/textual/pull/5365
+
+### Fixed
+
+- Fixed issue with alignment in auto containers https://github.com/Textualize/textual/pull/5360
+
+## [0.89.1] - 2024-12-05
+
+### Fixed
+
+- Fixed alignment of docked widgets https://github.com/Textualize/textual/pull/5347
+
+## [0.89.0] - 2024-12-05
+
+## Added
+
+- Added "tab" border style https://github.com/Textualize/textual/pull/5335
+- Added support for XML syntax highlighting https://github.com/Textualize/textual/pull/5320
+- Added `TextArea.update_highlight_query` https://github.com/Textualize/textual/pull/5320
+- `Input` widget now supports text selection via mouse and keyboard https://github.com/Textualize/textual/pull/5340
+- Added new keybinds (hold shift) for text selection in `Input` https://github.com/Textualize/textual/pull/5340
+- Added `Input.selection` reactive attribute for reading and updating the current selection https://github.com/Textualize/textual/pull/5340
+- Added `Input.select_on_focus` (default `True`) to enable/disable selecting all text in an `Input` on focus https://github.com/Textualize/textual/pull/5340
+- Added methods `Input.replace`, `Input.insert`, `Input.delete`, `Input.delete_selection` for editing text https://github.com/Textualize/textual/pull/5340
+- Added `Input.selected_text` property for getting the currently selected text https://github.com/Textualize/textual/pull/5340
+- `Input` can now be scrolled independently of cursor position (hold shift and scroll with the mouse wheel in supported environments) https://github.com/Textualize/textual/pull/5340
+
+## Changed
+
+- Breaking change: Removed `Input` reactive attributes `view_position`, `cursor_position` (now exists as a property which proxies to the `Input.selection` reactive attribute), https://github.com/Textualize/textual/pull/5340
+- `Input.restrict` now checked on all edit operations (rather than just on `insert`) https://github.com/Textualize/textual/pull/5340
+
+## Fixed
+
+- Fixed Select not scrolling highlight in to view when clicked https://github.com/Textualize/textual/issues/5255
+- Upgraded tree-sitter to 0.23+ (`syntax` extras) https://github.com/Textualize/textual/pull/5320
+- Some syntax highlighting changes due to tree-sitter updates https://github.com/Textualize/textual/pull/5320
+- Breaking change: `Document.query_syntax_tree` signature changed https://github.com/Textualize/textual/pull/5320
+- Breaking change: `TextArea.register_language` signature changed https://github.com/Textualize/textual/pull/5320
+- Breaking change: `SyntaxAwareDocument.language_name` property removed https://github.com/Textualize/textual/pull/5320
+- Breaking change: Kotlin syntax highlighting removed from `TextArea` https://github.com/Textualize/textual/pull/5320
+- Fixed selection list wrapping https://github.com/Textualize/textual/pull/5331
+- Fixed CSS encoding issue on Windows https://github.com/Textualize/textual/pull/5324
+
+## [0.88.1] - 2024-11-30
+
+### Fixed
+
+- Fixed excessive rendering of the OptionList https://github.com/Textualize/textual/pull/5311
+- Fixed rendering glitches in Select https://github.com/Textualize/textual/pull/5311
+
+## [0.88.0] - 2024-11-29
+
+### Fixed
+
+- Fixed infinite loop in `Widget.anchor` https://github.com/Textualize/textual/pull/5290
+- Restores the ability to supply console markup to command list https://github.com/Textualize/textual/pull/5294
+- Fixed delayed App Resize event https://github.com/Textualize/textual/pull/5296
+- Fixed `ListView` not updating its index or highlighting after removing items https://github.com/Textualize/textual/issues/5114
+- Fixed ListView focus styling rule being too broad https://github.com/Textualize/textual/pull/5304
+- Fixed issue with auto-generated tab IDs https://github.com/Textualize/textual/pull/5298
+
+### Changed
+
+- `ListView.pop` now returns `AwaitComplete` rather than `AwaitRemove` https://github.com/Textualize/textual/pull/5135
+- `ListView.remove_items` now returns `AwaitComplete` rather than `AwaitRemove` https://github.com/Textualize/textual/pull/5135
+
+
+## [0.87.1] - 2024-11-24
+
+## Fixed
+
+- Fixed offset not being applied to grid layout https://github.com/Textualize/textual/pull/5281
+- Fixed Select overlay set to auto width https://github.com/Textualize/textual/pull/5282
+
+## [0.87.0] - 2024-11-24
+
+### Added
+
+- Added Styles.has_any_rules https://github.com/Textualize/textual/pull/5264
+- Added `position` CSS rule. https://github.com/Textualize/textual/pull/5278
+- Added `Widget.set_scroll` https://github.com/Textualize/textual/pull/5278
+- Added `Select.selection` https://github.com/Textualize/textual/pull/5278
+
+### Fixed 
+
+- Fixed offset applied to docked widgets https://github.com/Textualize/textual/pull/5264
+- Fixed loading widgets responding to input https://github.com/Textualize/textual/pull/5267
+
+## [0.86.3] - 2024-11-19
+
+### Changed
+
+- Updated the tutorial (text and code) https://github.com/Textualize/textual/pull/5257
+
+### Fixed
+
+- Fixed a glitch with the scrollbar that occurs when you hold `a` to add stopwatches in the tutorial app https://github.com/Textualize/textual/pull/5257
+
+
+## [0.86.2] - 2024-11-18
+
+### Fixed
+
+- Fixed visibility glitch for widgets with an offset https://github.com/Textualize/textual/pull/5253
+- Fixed theme variables being unavailable in code until refresh_css was called https://github.com/Textualize/textual/pull/5254
+
+
+## [0.86.1] - 2024-11-16
+
+### Fixed
+
+- Tweaks to demo
+
+## [0.86.0] - 2024-11-16
+
+### Fixed
+
+- Fixed duplicated key displays in the help panel https://github.com/Textualize/textual/issues/5037
+- Fixed `TextArea` mouse selection with tab characters https://github.com/Textualize/textual/issues/5212
+- Fixed `Tabs` not updating the highlighting after removing a tab https://github.com/Textualize/textual/issues/5218
+
+### Added
+
+- Added `App.theme` reactive attribute https://github.com/Textualize/textual/pull/5087
+- Added various starter themes https://github.com/Textualize/textual/pull/5087
+- Added "Change theme" command to command palette https://github.com/Textualize/textual/pull/5087
+- Added `variant` parameter to `Label` widget for quick access to common styles https://github.com/Textualize/textual/pull/5087
+- Added `App.get_theme` which returns a theme by name https://github.com/Textualize/textual/pull/5087
+- Added `App.register_theme` and `App.unregister_theme` https://github.com/Textualize/textual/pull/5087
+- Added `App.theme_changed_signal` https://github.com/Textualize/textual/pull/5087
+- Added `App.available_themes` property which returns a mapping of theme names to `Theme` instances https://github.com/Textualize/textual/pull/5087
+- Added `App.current_theme` property which returns the currently active theme object https://github.com/Textualize/textual/pull/5087
+- Added `App.get_theme_variable_defaults` which returns a mapping of theme variables to their default values https://github.com/Textualize/textual/pull/5087
+- Added `App.search` which allows bringing up a fuzzy search list of commands on-demand https://github.com/Textualize/textual/pull/5087
+- Added `App.search_themes` which allows bringing up a fuzzy search list of themes on-demand https://github.com/Textualize/textual/pull/5087
+- Added `textual.theme.ThemeProvider`, a command palette provider which returns all registered themes https://github.com/Textualize/textual/pull/5087
+- Added several new built-in CSS variables https://github.com/Textualize/textual/pull/5087
+- Added support for in-band terminal resize protocol https://github.com/Textualize/textual/pull/5217
+- Added TEXTUAL_THEME environment var, which should be a comma separated list of desired themes https://github.com/Textualize/textual/pull/5238
+- Added `Widget.is_scrolling` https://github.com/Textualize/textual/pull/5238
+- Added `Tree.add_json` https://github.com/Textualize/textual/pull/5238
+
+### Changed
+
+- `Driver.process_event` is now `Driver.process_message` https://github.com/Textualize/textual/pull/5217
+- `Driver.send_event` is now `Driver.send_message` https://github.com/Textualize/textual/pull/5217
+- Added `can_focus` and `can_focus_children` parameters to scrollable container types. https://github.com/Textualize/textual/pull/5226
+- Added `textual.lazy.Reveal` https://github.com/Textualize/textual/pull/5226
+- Added `Screen.action_blur` https://github.com/Textualize/textual/pull/5226
+- `Click` events can now be used with the on decorator to match the originally clicked widget https://github.com/Textualize/textual/pull/5238
+- Breaking change: Removed `App.dark` reactive attribute https://github.com/Textualize/textual/pull/5087
+- Breaking change: To improve consistency, several changes have been made to default widget CSS and the CSS variables which ship with Textual. On upgrading, your app will likely look different. All of these changes can be overidden with your own CSS. https://github.com/Textualize/textual/pull/5087
+
+### Removed
+
+- Removed `App.HOVER_EFFECTS_SCROLL_PAUSE` https://github.com/Textualize/textual/pull/5238
+
 ## [0.85.2] - 2024-11-02
 
 - Fixed broken focus-within https://github.com/Textualize/textual/pull/5190
@@ -213,6 +387,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Removed `ctrl_to_caret` and `upper_case_keys` from Footer. These can be implemented in `App.get_key_display`.
 - Renamed `SystemCommands` to `SystemCommandsProvider` https://github.com/Textualize/textual/pull/4920
 - Breaking change: Removed `ClassicFooter` widget (please use new `Footer` widget) https://github.com/Textualize/textual/pull/4921
+- Breaking change: `App.get_key_display` now requires `textual.binding.Binding` instead of `str`.
 - Disallowed `Screen` instances in `App.SCREENS` and `App.MODES`
 
 ### Fixed
@@ -2493,6 +2668,17 @@ https://textual.textualize.io/blog/2022/11/08/version-040/#version-040
 - New handler system for messages that doesn't require inheritance
 - Improved traceback handling
 
+[1.0.0]: https://github.com/Textualize/textual/compare/v0.89.1...v1.0.0
+[0.89.1]: https://github.com/Textualize/textual/compare/v0.89.0...v0.89.1
+[0.89.0]: https://github.com/Textualize/textual/compare/v0.88.1...v0.89.0
+[0.88.1]: https://github.com/Textualize/textual/compare/v0.88.0...v0.88.1
+[0.88.0]: https://github.com/Textualize/textual/compare/v0.87.1...v0.88.0
+[0.87.1]: https://github.com/Textualize/textual/compare/v0.87.0...v0.87.1
+[0.87.0]: https://github.com/Textualize/textual/compare/v0.86.4...v0.87.0
+[0.86.3]: https://github.com/Textualize/textual/compare/v0.86.2...v0.86.3
+[0.86.2]: https://github.com/Textualize/textual/compare/v0.86.1...v0.86.2
+[0.86.1]: https://github.com/Textualize/textual/compare/v0.86.0...v0.86.1
+[0.86.0]: https://github.com/Textualize/textual/compare/v0.85.2...v0.86.0
 [0.85.2]: https://github.com/Textualize/textual/compare/v0.85.1...v0.85.2
 [0.85.1]: https://github.com/Textualize/textual/compare/v0.85.0...v0.85.1
 [0.85.0]: https://github.com/Textualize/textual/compare/v0.84.0...v0.85.0

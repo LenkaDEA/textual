@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import pytest
@@ -8,6 +10,7 @@ from tests.snapshot_tests.language_snippets import SNIPPETS
 from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding, Keymap
+from textual.command import SimpleCommand
 from textual.containers import Center, Container, Grid, Middle, Vertical, VerticalScroll
 from textual.pilot import Pilot
 from textual.renderables.gradient import LinearGradient
@@ -25,11 +28,17 @@ from textual.widgets import (
     ProgressBar,
     RadioSet,
     RichLog,
+    Select,
     SelectionList,
     Static,
     Switch,
+    Tab,
+    Tabs,
     TextArea,
+    TabbedContent,
+    TabPane,
 )
+from textual.theme import Theme
 from textual.widgets.text_area import BUILTIN_LANGUAGES, Selection, TextAreaTheme
 
 # These paths should be relative to THIS directory.
@@ -133,6 +142,96 @@ def test_input_suggestions(snap_compare):
     assert snap_compare(
         SNAPSHOT_APPS_DIR / "input_suggestions.py", press=["b"], run_before=run_before
     )
+
+
+def test_input_setting_value(snap_compare):
+    """Test that Inputs with different values are rendered correctly.
+
+    The values of inputs should be (from top to bottom): "default", "set attribute in compose"
+    , "" (empty), a placeholder of 'Placeholder, no value', and "set in on_mount".
+    """
+
+    class InputApp(App[None]):
+        def compose(self) -> ComposeResult:
+            yield Input(value="default")
+            input2 = Input()
+            input2.value = "set attribute in compose"
+            yield input2
+            yield Input()
+            yield Input(placeholder="Placeholder, no value")
+            yield Input(id="input3")
+
+        def on_mount(self) -> None:
+            input3 = self.query_one("#input3", Input)
+            input3.value = "set in on_mount"
+
+    assert snap_compare(InputApp())
+
+
+def test_input_cursor(snap_compare):
+    """The first input should say こんにちは.
+    The second input should say こんにちは, with a cursor on the final character (double width).
+    Note that this might render incorrectly in the SVG output - the letters may overlap."""
+
+    class InputApp(App[None]):
+        def compose(self) -> ComposeResult:
+            yield Input(value="こんにちは")
+            input = Input(value="こんにちは", select_on_focus=False)
+            input.focus()
+            input.action_cursor_left()
+            yield input
+
+    assert snap_compare(InputApp())
+
+
+def test_input_scrolls_to_cursor(snap_compare):
+    """The input widget should scroll the cursor into view when it moves,
+    and this should account for different cell widths.
+
+    Only the final two characters should be visible in the first input (ちは).
+    They might be overlapping in the SVG output.
+
+    In the second input, we should only see numbers 5-9 inclusive, plus the cursor.
+    The number of cells to the right of the cursor should equal the number of cells
+    to the left of the number '5'.
+    """
+
+    class InputScrollingApp(App[None]):
+        CSS = "Input { width: 12; }"
+
+        def compose(self) -> ComposeResult:
+            yield Input(id="input1")
+            yield Input(id="input2")
+
+    assert snap_compare(
+        InputScrollingApp(), press=[*"こんにちは", "tab", *"0123456789"]
+    )
+
+
+def test_input_initial_scroll(snap_compare):
+    """When the input is smaller than its content, the start of the content should
+    be visible, not the end."""
+
+    class InputInitialScrollApp(App[None]):
+        AUTO_FOCUS = None
+
+        def compose(self) -> ComposeResult:
+            yield Input(value="the quick brown fox jumps over the lazy dog")
+
+    assert snap_compare(InputInitialScrollApp(), terminal_size=(20, 5))
+
+
+def test_input_selection(snap_compare):
+    """BCDEF should be visible, and DEF should be selected. The cursor should be
+    sitting above 'D'."""
+
+    class InputSelectionApp(App[None]):
+        CSS = "Input { width: 12; }"
+
+        def compose(self) -> ComposeResult:
+            yield Input(id="input1")
+
+    assert snap_compare(InputSelectionApp(), press=[*"ABCDEF", *("shift+left",) * 3])
 
 
 def test_masked_input(snap_compare):
@@ -1286,7 +1385,7 @@ def test_vertical_max_height(snap_compare):
 
 
 def test_max_height_100(snap_compare):
-    """Test vertical max height takes border in to account."""
+    """Test a datatable with max height 100%."""
     assert snap_compare(SNAPSHOT_APPS_DIR / "max_height_100.py")
 
 
@@ -1345,12 +1444,12 @@ def test_recompose(snap_compare):
     assert snap_compare(SNAPSHOT_APPS_DIR / "recompose.py")
 
 
-@pytest.mark.parametrize("dark", [True, False])
-def test_ansi_color_mapping(snap_compare, dark):
+@pytest.mark.parametrize("theme", ["textual-dark", "textual-light"])
+def test_ansi_color_mapping(snap_compare, theme):
     """Test how ANSI colors in Rich renderables are mapped to hex colors."""
 
     def setup(pilot):
-        pilot.app.dark = dark
+        pilot.app.theme = theme
 
     assert snap_compare(SNAPSHOT_APPS_DIR / "ansi_mapping.py", run_before=setup)
 
@@ -1411,7 +1510,7 @@ def test_example_color_command(snap_compare):
     """Test the color_command example."""
     assert snap_compare(
         EXAMPLES_DIR / "color_command.py",
-        press=[App.COMMAND_PALETTE_BINDING, "r", "e", "d", "down", "enter"],
+        press=[App.COMMAND_PALETTE_BINDING, "r", "e", "d", "enter"],
     )
 
 
@@ -2347,7 +2446,7 @@ def test_fr_and_margin(snap_compare):
 
     class FRApp(App):
         CSS = """
-        #first-container {            
+        #first-container {
             background: green;
             height: auto;
         }
@@ -2355,7 +2454,7 @@ def test_fr_and_margin(snap_compare):
         #second-container {
             margin: 2;
             background: red;
-            height: auto;        
+            height: auto;
         }
 
         #third-container {
@@ -2416,3 +2515,599 @@ def test_split_segments_infinite_loop(snap_compare):
 
     """
     assert snap_compare(SNAPSHOT_APPS_DIR / "split_segments.py")
+
+
+@pytest.mark.parametrize("theme_name", ["nord", "gruvbox"])
+def test_themes(snap_compare, theme_name):
+    """Test setting different themes and custom theme variables.
+
+    The colors from the theme should be clear, and the text-style of the label
+    should be bold italic, since that's set in the custom theme variable.
+    """
+
+    class ThemeApp(App[None]):
+        CSS = """
+        Screen {
+            align: center middle;
+        }
+        
+        Label {
+            background: $panel;
+            color: $text;
+            padding: 1 2;
+            border: wide $primary;
+            text-style: $theme-label-style;
+        }
+        """
+
+        def get_theme_variable_defaults(self) -> dict[str, str]:
+            """Define a custom theme variable."""
+            return {"theme-label-style": "bold italic", "unused": "red"}
+
+        def compose(self) -> ComposeResult:
+            yield Label(f"{theme_name.title()} Theme")
+
+        def on_mount(self) -> None:
+            self.theme = theme_name
+
+    assert snap_compare(ThemeApp())
+
+
+def test_custom_theme_with_variables(snap_compare):
+    """Test creating and using a custom theme with variables that get overridden.
+
+    After the overrides from the theme, the background should be blue, the text should be white, the border should be yellow,
+    the style should be bold italic, and the label should be cyan.
+    """
+
+    class ThemeApp(App[None]):
+        CSS = """
+        Screen {
+            align: center middle;
+        }
+        
+        Label {
+            background: $custom-background;
+            color: $custom-text;
+            border: wide $custom-border;
+            padding: 1 2;
+            text-style: $custom-style;
+            text-align: center;
+            width: auto;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            yield Label("Custom Theme")
+
+        def get_theme_variable_defaults(self) -> dict[str, str]:
+            """Override theme variables."""
+            return {
+                "custom-text": "cyan",
+                "custom-style": "bold italic",
+                "custom-border": "red",
+                "custom-background": "#0000ff 50%",
+            }
+
+        def on_mount(self) -> None:
+            custom_theme = Theme(
+                name="my-custom",
+                primary="magenta",
+                background="black",
+                variables={
+                    "custom-background": "#ff0000 20%",
+                    "custom-text": "white",
+                    "custom-border": "yellow",
+                    "custom-style": "bold",
+                },
+            )
+            self.register_theme(custom_theme)
+            self.theme = "my-custom"
+
+    assert snap_compare(ThemeApp())
+
+
+def test_app_search_commands_opens_and_displays_search_list(snap_compare):
+    """Test the App.search_commands method for displaying a list of commands."""
+
+    class SearchApp(App[None]):
+        def compose(self) -> ComposeResult:
+            yield Label("Search Commands")
+
+        async def on_mount(self) -> None:
+            def callback():
+                """Dummy no-op callback."""
+
+            commands = [("foo", callback), ("bar", callback), ("baz", callback)]
+            await self.search_commands(commands)
+
+    async def run_before(pilot: Pilot) -> None:
+        await pilot.press("b")
+
+    assert snap_compare(SearchApp(), run_before=run_before)
+
+
+def test_help_panel_key_display_not_duplicated(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5037"""
+
+    class HelpPanelApp(App):
+        BINDINGS = [
+            Binding("b,e,l", "bell", "Ring the bell", key_display="foo"),
+        ]
+
+        def compose(self) -> ComposeResult:
+            yield Footer()
+
+    async def run_before(pilot: Pilot):
+        pilot.app.action_show_help_panel()
+
+    app = HelpPanelApp()
+    assert snap_compare(app, run_before=run_before)
+
+
+def test_tabs_remove_tab_updates_highlighting(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5218"""
+
+    class TabsApp(App):
+        BINDINGS = [("r", "remove_foo", "Remove foo")]
+
+        def compose(self) -> ComposeResult:
+            yield Tabs(
+                Tab("foo", id="foo"),
+                Tab("bar", id="bar"),
+                active="bar",
+            )
+            yield Footer()
+
+        def action_remove_foo(self) -> None:
+            tabs = self.query_one(Tabs)
+            tabs.remove_tab("foo")
+
+    app = TabsApp()
+    assert snap_compare(app, press="r")
+
+
+def test_theme_variables_available_in_code(snap_compare):
+    """Test that theme variables are available in code."""
+
+    class ThemeVariablesApp(App):
+        def compose(self) -> ComposeResult:
+            yield Label("Hello")
+
+        def on_mount(self) -> None:
+            variables = self.theme_variables
+            label = self.query_one(Label)
+            label.update(f"$text-primary = {variables['text-primary']}")
+            label.styles.background = variables["primary-muted"]
+            label.styles.color = variables["text-primary"]
+
+    assert snap_compare(ThemeVariablesApp())
+
+
+def test_dock_offset(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5261
+    You should see 10 labels, 0 thru 9, in a diagonal line starting at the top left.
+    """
+
+    class OffsetBugApp(App):
+        CSS = """
+        .label {
+            dock: top;
+            color: $text-success;
+            background: $success-muted;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            # I'd expect this to draw a diagonal line of labels, but it places them all at the top left.
+            for i in range(10):
+                label = Label(str(i), classes="label")
+                label.styles.offset = (i, i)
+                yield label
+
+    assert snap_compare(OffsetBugApp())
+
+
+def test_select_overlay_constrain(snap_compare):
+    """Check that the constrain logic on Select is working.
+    You should see the select overlay in full, anchored to the bottom of the screen."""
+
+    class OApp(App):
+        CSS = """
+        Label {
+            height: 16;
+            background: blue;
+            border: tall white;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            yield Label("Padding (ignore)")
+            yield Select.from_values(["Foo", "bar", "baz"] * 10)
+
+    async def run_before(pilot: Pilot) -> None:
+        await pilot.pause()
+        await pilot.click(Select)
+
+    assert snap_compare(OApp(), run_before=run_before)
+
+
+def test_position_absolute(snap_compare):
+    """Check position: absolute works as expected.
+    You should see three staggered labels at the top-left, and three staggered relative labels in the center.
+    The relative labels will have an additional line between them.
+    """
+
+    class AbsoluteApp(App):
+        CSS = """
+        Screen {        
+            align: center middle;
+
+            .absolute {
+                position: absolute;
+            }
+
+            .relative {
+                position: relative;
+            }
+
+            .offset1 {
+                offset: 1 1;
+            }
+            .offset2 {
+                offset: 2 2;                
+            }
+            .offset3 {
+                offset: 3 3;
+            }
+        }
+
+        """
+
+        def compose(self) -> ComposeResult:
+            yield Label("Absolute 1", classes="absolute offset1")
+            yield Label("Absolute 2", classes="absolute offset2")
+            yield Label("Absolute 3", classes="absolute offset3")
+
+            yield Label("Relative 1", classes="relative offset1")
+            yield Label("Relative 2", classes="relative offset2")
+            yield Label("Relative 3", classes="relative offset3")
+
+    assert snap_compare(AbsoluteApp())
+
+
+def test_grid_offset(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5279
+    You should see 6 boxes arranged in a 3x2 grid. The 6th should be offset 10 lines down.
+    """
+
+    class GridOffsetApp(App):
+        CSS = """
+        Screen {
+            layout: grid;
+            grid-size: 3 2;
+        }
+
+        .box {
+            height: 100%;
+            border: solid green;
+        }
+
+        #six {   
+            offset: 0 10;
+            background: blue;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            yield Static("One", classes="box")
+            yield Static("Two", classes="box")
+            yield Static("Three", classes="box")
+            yield Static("Four", classes="box")
+            yield Static("Five", classes="box")
+            yield Static("Six", classes="box", id="six")
+
+    assert snap_compare(GridOffsetApp())
+
+
+def test_select_width_auto(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5280"
+    The overlay has a width of auto, so the first (widest) option should not wrap."""
+
+    class TallSelectApp(App[None]):
+        CSS = """
+            Screen {
+                align: center middle;
+
+                & > Select {
+                    width: 50;
+
+                    & > SelectOverlay {
+                        max-height: 100vh;
+                        width: auto;
+                    }
+                }
+            }
+        """
+
+        def compose(self) -> ComposeResult:
+            yield Select(
+                [("Extra long option here", 100)]
+                + [(f"Option {idx + 1}", idx) for idx in range(100)],
+                value=100,
+            )
+
+    async def run_before(pilot: Pilot) -> None:
+        await pilot.pause()
+        await pilot.click("Select")
+
+    snap_compare(TallSelectApp(), run_before=run_before)
+
+
+def test_markup_command_list(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5276
+    You should see a command list, with console markup applied to the action name and help text."""
+
+    class MyApp(App):
+        def on_mount(self) -> None:
+            self.search_commands(
+                [
+                    SimpleCommand(
+                        "Hello [u green]World", lambda: None, "Help [u red]text"
+                    )
+                ]
+            )
+
+    snap_compare(MyApp())
+
+
+def test_app_resize_order(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5284
+    You should see a placeholder with text "BAR", focused and scrolled down so it fills the screen.
+    """
+
+    class FocusPlaceholder(Placeholder, can_focus=True):
+        pass
+
+    class NarrowScreen(Screen):
+        AUTO_FOCUS = "#bar"
+
+        def compose(self) -> ComposeResult:
+            yield FocusPlaceholder("FOO", id="foo")
+            yield FocusPlaceholder("BAR", id="bar")
+
+    class SCApp(App):
+        CSS = """
+        Placeholder:focus {
+            border: heavy white;
+        }
+        #foo {
+            height: 24;
+        }
+        #bar {
+            height: 1fr;
+        }
+
+        .narrow #bar {
+            height: 100%;
+        }
+
+        """
+
+        def on_mount(self) -> None:
+            self.push_screen(NarrowScreen())
+
+        def on_resize(self) -> None:
+            self.add_class("narrow")
+
+    snap_compare(SCApp())
+
+
+def test_add_remove_tabs(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5215
+    You should see a TabbedContent with three panes, entitled 'tab-2', 'New tab' and 'New tab'"""
+
+    class ExampleApp(App):
+        BINDINGS = [
+            ("r", "remove_pane", "Remove first pane"),
+            ("a", "add_pane", "Add pane"),
+        ]
+
+        def compose(self) -> ComposeResult:
+            with TabbedContent(initial="tab-2"):
+                with TabPane("tab-1"):
+                    yield Label("tab-1")
+                with TabPane("tab-2"):
+                    yield Label("tab-2")
+            yield Footer()
+
+        def action_remove_pane(self) -> None:
+            tabbed_content = self.query_one(TabbedContent)
+            tabbed_content.remove_pane("tab-1")
+
+        def action_add_pane(self) -> None:
+            tabbed_content = self.query_one(TabbedContent)
+            new_pane = TabPane("New tab", Label("new"))
+            tabbed_content.add_pane(new_pane)
+
+    snap_compare(ExampleApp(), press=["a", "r", "a"])
+
+
+def test_click_expand(snap_compare):
+    """Should show an expanded select with 15 highlighted."""
+
+    class SelectApp(App):
+        def compose(self) -> ComposeResult:
+            yield Select.from_values(
+                range(20),
+                value=15,
+            )
+
+    async def run_before(pilot: Pilot) -> None:
+        await pilot.pause()
+        await pilot.click(Select)
+
+    snap_compare(SelectApp(), run_before=run_before)
+
+
+def test_disable_command_palette(snap_compare):
+    """Test command palette may be disabled by check_action.
+    You should see a footer with an enabled binding, and the command palette binding greyed out."""
+
+    class FooterApp(App):
+        BINDINGS = [("b", "bell", "Bell")]
+
+        def compose(self) -> ComposeResult:
+            yield Footer()
+
+        def check_action(
+            self, action: str, parameters: tuple[object, ...]
+        ) -> bool | None:
+            if action == "command_palette":
+                return None
+            return True
+
+    snap_compare(FooterApp())
+
+
+def test_selection_list_wrap(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5326"""
+
+    class SelectionListApp(App):
+        def compose(self) -> ComposeResult:
+            yield SelectionList(("Hello World " * 100, 0))
+
+    snap_compare(SelectionListApp())
+
+
+def test_border_tab(snap_compare):
+    """Test tab border style. You should see a border with a left align tab
+    at the top and a right aligned tab at the bottom."""
+
+    class TabApp(App):
+        CSS = """
+        Screen {
+            align: center middle;
+        }
+        Label {
+            border: tab $border;
+            padding: 2 4;
+            border-title-align: left;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            label = Label("Hello, World")
+            label.border_title = "Tab Border"
+            label.border_subtitle = ":-)"
+            yield label
+
+    snap_compare(TabApp())
+
+
+def test_dock_align(snap_compare):
+    """Regression test for https://github.com/Textualize/textual/issues/5345
+    You should see a blue panel aligned to the top right of the screen, with a centered button."""
+
+    class MainContainer(Static):
+        def compose(self):
+            yield Sidebar()
+
+    # ~~~~ Sidebar widget ~~~~
+    class Sidebar(Static):
+        def compose(self):
+            yield StartButtons()
+
+    # ~~~~ the two buttons inside the sidebar ~~~~
+    class StartButtons(Static):
+        def compose(self):
+            yield Button("Start", variant="primary", id="start")
+            yield Button("Stop", variant="error", id="stop")
+
+    # ~~~~ main ~~~~
+    class Test1(App):
+        CSS = """
+
+        Screen {
+            layout: horizontal;
+        }
+
+        MainContainer {    
+            width: 100%;
+            height: 100%;
+            background: red;
+            layout: horizontal;
+        }
+
+
+        Sidebar {
+            width: 40;
+            background: blue;
+            border: double green;
+            layout: vertical;
+
+        /* seems to be a weird interaction between these two */
+        /*    V V V V    */
+            dock: right;
+            align-horizontal: center;
+
+        }
+
+        StartButtons {
+            max-width: 18.5;
+            height: 5;
+            background: $boost;
+            padding: 1;
+            layout: horizontal;
+        }
+        #start {
+            dock: left;
+        }
+        #stop {
+            dock: left;
+        }
+
+
+"""
+
+        def compose(self):
+            yield MainContainer()
+
+    snap_compare(Test1())
+
+
+def test_auto_parent_with_alignment(snap_compare):
+    class Sidebar(Vertical):
+        DEFAULT_CSS = """
+        Sidebar {
+            dock: right;  # Not strictly required to replicate the issue
+            width: auto;
+            height: auto;
+            background: blue;
+            align-vertical: bottom;
+
+            #contents {
+                width: auto;
+                height: auto;
+                background: red;
+                border: white;
+            }        
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            with Vertical(id="contents"):
+                yield Button("Start")
+                yield Button("Stop")
+
+    class FloatSidebarApp(App):
+        CSS = """
+        Screen {
+            layers: base sidebar;
+        }
+        """
+
+        def compose(self) -> ComposeResult:
+            yield Sidebar()
+
+    snap_compare(FloatSidebarApp())

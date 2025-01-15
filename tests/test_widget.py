@@ -11,6 +11,7 @@ from textual.css.errors import StyleValueError
 from textual.css.query import NoMatches
 from textual.geometry import Offset, Size
 from textual.message import Message
+from textual.visual import RichVisual
 from textual.widget import BadWidgetName, MountError, PseudoClasses, Widget
 from textual.widgets import (
     Button,
@@ -444,6 +445,45 @@ async def test_loading():
         assert label._cover_widget is None
 
 
+async def test_loading_button():
+    """Test loading indicator renders buttons unclickable."""
+
+    counter = 0
+
+    class LoadingApp(App):
+        def compose(self) -> ComposeResult:
+            yield Button("Hello, World", action="app.inc")
+
+        def action_inc(self) -> None:
+            nonlocal counter
+            counter += 1
+
+    async with LoadingApp().run_test() as pilot:
+        # Sanity check
+        assert counter == 0
+
+        button = pilot.app.query_one(Button)
+        button.active_effect_duration = 0
+
+        # Click the button to advance the counter
+        await pilot.click(button)
+        assert counter == 1
+
+        # Set the button to loading state
+        button.loading = True
+
+        # A click should do nothing
+        await pilot.click(button)
+        assert counter == 1
+
+        # Set the button to not loading
+        button.loading = False
+
+        # Click should advance counter
+        await pilot.click(button)
+        assert counter == 2
+
+
 async def test_is_mounted_property():
     class TestWidgetIsMountedApp(App):
         pass
@@ -492,8 +532,11 @@ async def test_render_returns_text():
 
     widget = SimpleWidget()
     render_result = widget._render()
-    assert isinstance(render_result, Text)
-    assert render_result.plain == "Hello World!"
+    assert isinstance(render_result, RichVisual)
+    renderable = render_result._renderable
+    assert isinstance(renderable, Text)
+
+    assert renderable.plain == "Hello World!"
 
 
 async def test_sort_children() -> None:
